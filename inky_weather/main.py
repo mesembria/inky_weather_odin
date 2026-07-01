@@ -59,11 +59,11 @@ def main(argv=None):
                         help="Write PNG to PATH instead of the display")
     args = parser.parse_args(argv)
 
-    cfg = {} if args.fixture else _load_config()
-    if args.fixture and not cfg:
-        cfg = {"location_name": "Blacksburg, VA"}
-
     try:
+        if args.fixture:
+            cfg = {"location_name": "Blacksburg, VA"}
+        else:
+            cfg = _load_config()
         img = build_image(args.fixture, cfg)
     except Exception as exc:  # render an error card rather than crash silently
         img = render.render_error(str(exc)[:80])

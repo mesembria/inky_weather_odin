@@ -87,7 +87,7 @@ def _sample_days():
 def test_draw_daily_row_runs():
     img, d = _blank()
     day = _sample_days()[0]
-    blank_icon = Image.new("RGBA", (26, 26), (0, 0, 0, 0))
+    blank_icon = Image.new("RGBA", (render.ICON_SZ_DAY, render.ICON_SZ_DAY), (0, 0, 0, 0))
     render.draw_daily_row(img, d, day, y=40, row_h=45, icon=blank_icon,
                           global_lo=10, global_hi=90)
     L = render.LAYOUT
@@ -103,7 +103,7 @@ def test_render_display_returns_image():
     hours = _sample_hours()
     days = _sample_days()
     hour_icons = [Image.new("RGBA", (34, 34), (0, 0, 0, 0))] * len(hours)
-    day_icons = [Image.new("RGBA", (26, 26), (0, 0, 0, 0))] * len(days)
+    day_icons = [Image.new("RGBA", (render.ICON_SZ_DAY, render.ICON_SZ_DAY), (0, 0, 0, 0))] * len(days)
     img = render.render_display(
         hours, days, hour_icons, day_icons,
         location_name="Blacksburg, VA", date_str="Tue Jun 30", updated_str="10:02 AM",
