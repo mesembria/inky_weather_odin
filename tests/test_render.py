@@ -74,3 +74,26 @@ def test_draw_hourly_panel_runs_and_marks():
         if img.getpixel((x, y)) != render.PAPER
     )
     assert changed > 0
+
+
+def _sample_days():
+    from inky_weather import weather
+    import os, json
+    fx = os.path.join(os.path.dirname(__file__), "..", "inky_weather", "fixtures")
+    with open(os.path.join(fx, "daily_response.json")) as f:
+        return weather.parse_daily(json.load(f), count=10)
+
+
+def test_draw_daily_row_runs():
+    img, d = _blank()
+    day = _sample_days()[0]
+    blank_icon = Image.new("RGBA", (26, 26), (0, 0, 0, 0))
+    render.draw_daily_row(img, d, day, y=40, row_h=45, icon=blank_icon,
+                          global_lo=10, global_hi=90)
+    L = render.LAYOUT
+    changed = any(
+        img.getpixel((x, y)) != render.PAPER
+        for x in range(L["hourly_w"] + 4, render.WIDTH, 5)
+        for y in range(40, 85, 5)
+    )
+    assert changed

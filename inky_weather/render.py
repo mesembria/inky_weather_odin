@@ -172,3 +172,61 @@ def draw_hourly_panel(img, draw, hours, icons):
 
     # Vertical divider between panels
     draw.rectangle([L["hourly_w"], 0, L["hourly_w"] + 2, HEIGHT], fill=BLACK)
+
+
+def _draw_precip_bar(draw, x, y, track_w, label, cell, font_tiny):
+    """One horizontal precip bar: label, filled track (len=pop), %, pips."""
+    kind = weather.precip_kind(cell["pop"], cell["precip_type"], cell["thunder"])
+    color = kind_color(kind)
+    track_h = 12
+    draw.text((x, y + 1), label, font=font_tiny, fill=(120, 120, 120))
+    tx = x + 12
+    draw.rectangle([tx, y, tx + track_w, y + track_h], fill=(225, 221, 210))
+    fill_w = int((cell["pop"] / 100) * track_w)
+    if kind != "dry" and fill_w > 0:
+        draw.rectangle([tx, y, tx + fill_w, y + track_h], fill=color)
+    draw.text((tx + track_w - 26, y + 1), "{}%".format(cell["pop"]),
+              font=font_tiny, fill=(70, 70, 70) if fill_w < track_w * 0.55 else WHITE)
+    mx = tx + track_w + 4
+    if cell["thunder"] >= 30:
+        draw.text((mx, y), "⚡", font=font_tiny, fill=ORANGE)
+        mx += 10
+    level = weather.intensity_level(cell["qpf_mm"], cell["pop"])
+    for p in range(3):
+        pc = color if p < level else (216, 210, 196)
+        px = mx + p * 7
+        draw.ellipse([px, y + 4, px + 4, y + 8], fill=pc)
+
+
+def draw_daily_row(img, draw, day, y, row_h, icon, global_lo, global_hi):
+    """Draw one day's row in the right strip."""
+    L = LAYOUT
+    strip_x = L["hourly_w"] + 2
+    strip_w = L["daily_w"] - 2
+    tiny = load_font(11)
+    micro = load_font(10)
+
+    if icon is not None:
+        img.paste(icon, (strip_x + 6, int(y + row_h / 2 - 16)), icon)
+    draw_centered_text(draw, day["name"], strip_x + 20, y + row_h - 8, micro, BLACK)
+
+    content_x = strip_x + 40
+    content_w = strip_w - 42
+
+    g_range = (global_hi - global_lo) or 1
+    t_bar_x = content_x + 20
+    t_bar_w = content_w - 40
+    t_bar_y = y + 6
+    t_bar_h = 8
+    draw.text((content_x, t_bar_y - 1), "{}°".format(day["lo_f"]), font=micro, fill=BLUE)
+    draw.rectangle([t_bar_x, t_bar_y, t_bar_x + t_bar_w, t_bar_y + t_bar_h], fill=(215, 215, 215))
+    seg_l = int(((day["lo_f"] - global_lo) / g_range) * t_bar_w)
+    seg_r = int(((day["hi_f"] - global_lo) / g_range) * t_bar_w)
+    draw.rectangle([t_bar_x + seg_l, t_bar_y, t_bar_x + seg_r, t_bar_y + t_bar_h],
+                   fill=temp_color(day["hi_f"]))
+    draw.text((t_bar_x + t_bar_w + 3, t_bar_y - 1), "{}°".format(day["hi_f"]),
+              font=micro, fill=RED)
+
+    p_track_w = content_w - 70
+    _draw_precip_bar(draw, content_x, y + 18, p_track_w, "D", day["day"], tiny)
+    _draw_precip_bar(draw, content_x, y + 31, p_track_w, "N", day["night"], tiny)
