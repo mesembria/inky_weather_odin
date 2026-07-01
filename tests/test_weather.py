@@ -21,3 +21,19 @@ def test_c_to_f_rounds_to_int():
 
 def test_c_to_f_negative():
     assert weather.c_to_f(-4.4) == 24
+
+
+def test_hour_label_midnight():
+    assert weather.hour_label(0) == "12A"
+
+
+def test_hour_label_noon():
+    assert weather.hour_label(12) == "12P"
+
+
+def test_hour_label_morning():
+    assert weather.hour_label(6) == "6A"
+
+
+def test_hour_label_evening():
+    assert weather.hour_label(15) == "3P"
