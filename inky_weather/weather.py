@@ -50,3 +50,30 @@ def precip_kind(pop, precip_type, thunder):
     if precip_type in ("SLEET", "ICE", "FREEZING_RAIN"):
         return "mix"
     return "rain"
+
+
+def parse_hourly(data, count=12):
+    """Extract the first `count` hours from a Google hourly response.
+
+    Returns a list of dicts (see module docstring for shape).
+    """
+    hours = []
+    for obj in data.get("forecastHours", [])[:count]:
+        cond = obj.get("weatherCondition", {})
+        precip = obj.get("precipitation", {})
+        prob = precip.get("probability", {})
+        hour = obj.get("displayDateTime", {}).get("hours", 0)
+        hours.append({
+            "hour": hour,
+            "ampm_label": hour_label(hour),
+            "is_daytime": obj.get("isDaytime", True),
+            "condition": cond.get("type", "UNKNOWN"),
+            "icon_uri": cond.get("iconBaseUri", ""),
+            "temp_f": c_to_f(obj.get("temperature", {}).get("degrees", 0)),
+            "feels_f": c_to_f(obj.get("feelsLikeTemperature", {}).get("degrees", 0)),
+            "pop": prob.get("percent", 0),
+            "precip_type": prob.get("type", "RAIN"),
+            "thunder": obj.get("thunderstormProbability", 0),
+            "uv": obj.get("uvIndex", 0),
+        })
+    return hours

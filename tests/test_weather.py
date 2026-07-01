@@ -77,3 +77,30 @@ def test_precip_kind_rain():
 
 def test_precip_kind_wintry_mix():
     assert weather.precip_kind(pop=50, precip_type="SLEET", thunder=0) == "mix"
+
+
+def test_parse_hourly_returns_twelve():
+    data = _load_fixture("hourly_response.json")
+    hours = weather.parse_hourly(data, count=12)
+    assert len(hours) == 12
+
+
+def test_parse_hourly_first_hour_fields():
+    data = _load_fixture("hourly_response.json")
+    first = weather.parse_hourly(data, count=12)[0]
+    assert first["temp_f"] == 76
+    assert first["feels_f"] == 77
+    assert first["condition"] == "PARTLY_CLOUDY"
+    assert first["pop"] == 20
+    assert first["precip_type"] == "RAIN"
+    assert first["thunder"] == 0
+    assert first["uv"] == 6
+    assert first["is_daytime"] is True
+    assert first["ampm_label"] == "10A"
+    assert first["icon_uri"].endswith("/partly_cloudy")
+
+
+def test_parse_hourly_handles_short_list():
+    data = {"forecastHours": _load_fixture("hourly_response.json")["forecastHours"][:3]}
+    hours = weather.parse_hourly(data, count=12)
+    assert len(hours) == 3
