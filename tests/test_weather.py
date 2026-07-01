@@ -57,3 +57,23 @@ def test_intensity_moderate():
 
 def test_intensity_heavy():
     assert weather.intensity_level(qpf_mm=12.0, pop=90) == 3
+
+
+def test_precip_kind_dry():
+    assert weather.precip_kind(pop=0, precip_type="RAIN", thunder=0) == "dry"
+
+
+def test_precip_kind_thunderstorm_takes_priority():
+    assert weather.precip_kind(pop=60, precip_type="RAIN", thunder=40) == "storm"
+
+
+def test_precip_kind_snow():
+    assert weather.precip_kind(pop=70, precip_type="SNOW", thunder=0) == "snow"
+
+
+def test_precip_kind_rain():
+    assert weather.precip_kind(pop=80, precip_type="RAIN", thunder=10) == "rain"
+
+
+def test_precip_kind_wintry_mix():
+    assert weather.precip_kind(pop=50, precip_type="SLEET", thunder=0) == "mix"

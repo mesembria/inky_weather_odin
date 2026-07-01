@@ -33,3 +33,20 @@ def intensity_level(qpf_mm, pop):
     if qpf_mm < 7.5:
         return 2
     return 3
+
+
+def precip_kind(pop, precip_type, thunder):
+    """Classify a precip cell into a semantic kind for coloring.
+
+    Returns one of: 'dry', 'storm', 'snow', 'mix', 'rain'.
+    Thunderstorm dominance (>=30%) takes priority over type.
+    """
+    if pop < 5:
+        return "dry"
+    if thunder >= 30:
+        return "storm"
+    if precip_type == "SNOW":
+        return "snow"
+    if precip_type in ("SLEET", "ICE", "FREEZING_RAIN"):
+        return "mix"
+    return "rain"
