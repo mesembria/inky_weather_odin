@@ -22,6 +22,9 @@ COLOR_SNOW = GREEN          # distinct from rain on a limited palette
 COLOR_MIX = GREEN
 COLOR_DRY = (210, 210, 210)
 
+ICON_SZ_HOUR = 34
+ICON_SZ_DAY = 32
+
 
 def kind_color(kind):
     """RGB for a precip kind name from weather.precip_kind()."""
@@ -81,6 +84,8 @@ LAYOUT = {
     "num_hours": 12,
     "num_days": 10,
 }
+LAYOUT["strip_x"] = LAYOUT["hourly_w"] + 2
+LAYOUT["strip_w"] = LAYOUT["daily_w"] - 2
 
 
 def draw_header(draw, location_name, date_str, updated_str):
@@ -114,6 +119,7 @@ def draw_hourly_panel(img, draw, hours, icons):
 
     small = load_font(12)
     tiny = load_font(11)
+    pct_font = load_font(10)
 
     # Night shading (full panel height)
     for i, h in enumerate(hours):
@@ -123,7 +129,7 @@ def draw_hourly_panel(img, draw, hours, icons):
                            fill=(225, 227, 240))
 
     # Temperature graph: icon positioned by temp, label below
-    icon_sz = 34
+    icon_sz = ICON_SZ_HOUR
     usable = L["temp_h"] - icon_sz - 22
     for i, h in enumerate(hours):
         cx = i * col_w + col_w / 2
@@ -147,14 +153,14 @@ def draw_hourly_panel(img, draw, hours, icons):
         cx = i * col_w + col_w / 2
         bar_h = max(2, int((h["pop"] / 100) * (L["precip_h"] - 4)))
         bar_top = precip_y + L["precip_h"] - bar_h
-        color = COLOR_STORM if h["thunder"] > 30 else COLOR_RAIN
+        color = COLOR_STORM if h["thunder"] >= 30 else COLOR_RAIN
         draw.rectangle([int(i * col_w + 3), bar_top, int((i + 1) * col_w - 3),
                         precip_y + L["precip_h"]], fill=color)
         if h["pop"] > 0:
             draw_centered_text(draw, "{}%".format(h["pop"]), cx, bar_top + 8,
-                               load_font(10), WHITE)
+                               pct_font, WHITE)
         if h["thunder"] >= 30:
-            draw_centered_text(draw, "⚡", cx, precip_y + 8, load_font(12), YELLOW)
+            draw_centered_text(draw, "⚡", cx, precip_y + 8, small, YELLOW)
 
     # UV row
     draw.line([0, uv_y, L["hourly_w"], uv_y], fill=(150, 150, 150))
@@ -201,13 +207,13 @@ def _draw_precip_bar(draw, x, y, track_w, label, cell, font_tiny):
 def draw_daily_row(img, draw, day, y, row_h, icon, global_lo, global_hi):
     """Draw one day's row in the right strip."""
     L = LAYOUT
-    strip_x = L["hourly_w"] + 2
-    strip_w = L["daily_w"] - 2
+    strip_x = L["strip_x"]
+    strip_w = L["strip_w"]
     tiny = load_font(11)
     micro = load_font(10)
 
     if icon is not None:
-        img.paste(icon, (strip_x + 6, int(y + row_h / 2 - 16)), icon)
+        img.paste(icon, (strip_x + 6, int(y + row_h / 2 - ICON_SZ_DAY // 2)), icon)
     draw_centered_text(draw, day["name"], strip_x + 20, y + row_h - 8, micro, BLACK)
 
     content_x = strip_x + 40
@@ -235,8 +241,8 @@ def draw_daily_row(img, draw, day, y, row_h, icon, global_lo, global_hi):
 def draw_daily_strip(img, draw, days, icons):
     """Draw all daily rows in the right strip using a shared temperature scale."""
     L = LAYOUT
-    strip_x = L["hourly_w"] + 2
-    strip_w = L["daily_w"] - 2
+    strip_x = L["strip_x"]
+    strip_w = L["strip_w"]
     row_h = (HEIGHT - L["header_h"]) / len(days)
     global_lo = min(d["lo_f"] for d in days)
     global_hi = max(d["hi_f"] for d in days)
