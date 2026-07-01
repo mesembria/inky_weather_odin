@@ -1,5 +1,6 @@
 """Pillow rendering for the Inky Impression weather display."""
 from PIL import Image, ImageDraw, ImageFont
+from . import weather
 
 WIDTH = 800
 HEIGHT = 480
@@ -80,3 +81,17 @@ LAYOUT = {
     "num_hours": 12,
     "num_days": 10,
 }
+
+
+def draw_header(draw, location_name, date_str, updated_str):
+    """Draw the top header band: location - date (left), updated (center)."""
+    L = LAYOUT
+    draw.rectangle([0, 0, WIDTH, L["header_h"]], fill=BLACK)
+    font = load_font(15)
+    left = location_name + " · " + date_str if location_name else date_str
+    draw.text((10, L["header_h"] / 2 - 8), left, font=font, fill=WHITE)
+    updated = "Updated " + updated_str
+    draw_centered_text(draw, updated, L["hourly_w"] / 2 + 120, L["header_h"] / 2,
+                       load_font(12), (200, 200, 200))
+    draw_centered_text(draw, "10-DAY FORECAST", L["hourly_w"] + L["daily_w"] / 2,
+                       L["header_h"] / 2, load_font(11), (210, 210, 210))

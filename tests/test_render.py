@@ -40,3 +40,14 @@ def test_layout_zones_sum_to_height():
 def test_layout_widths():
     L = render.LAYOUT
     assert L["hourly_w"] + L["daily_w"] == render.WIDTH
+
+
+def _blank():
+    img = Image.new("RGB", (render.WIDTH, render.HEIGHT), render.PAPER)
+    return img, ImageDraw.Draw(img)
+
+
+def test_draw_header_marks_top_band():
+    img, d = _blank()
+    render.draw_header(d, "Blacksburg, VA", "Tue Jun 30", "10:02 AM")
+    assert any(img.getpixel((x, 10)) != render.PAPER for x in range(0, render.WIDTH, 20))
