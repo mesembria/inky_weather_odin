@@ -51,3 +51,26 @@ def test_draw_header_marks_top_band():
     img, d = _blank()
     render.draw_header(d, "Blacksburg, VA", "Tue Jun 30", "10:02 AM")
     assert any(img.getpixel((x, 10)) != render.PAPER for x in range(0, render.WIDTH, 20))
+
+
+def _sample_hours():
+    from inky_weather import weather
+    import os, json
+    fx = os.path.join(os.path.dirname(__file__), "..", "inky_weather", "fixtures")
+    with open(os.path.join(fx, "hourly_response.json")) as f:
+        return weather.parse_hourly(json.load(f), count=12)
+
+
+def test_draw_hourly_panel_runs_and_marks():
+    img, d = _blank()
+    hours = _sample_hours()
+    blank_icon = Image.new("RGBA", (34, 34), (0, 0, 0, 0))
+    icons = [blank_icon] * len(hours)
+    render.draw_hourly_panel(img, d, hours, icons)
+    L = render.LAYOUT
+    changed = sum(
+        1 for x in range(0, L["hourly_w"], 5)
+        for y in range(L["header_h"], render.HEIGHT, 5)
+        if img.getpixel((x, y)) != render.PAPER
+    )
+    assert changed > 0

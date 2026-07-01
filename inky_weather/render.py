@@ -95,3 +95,80 @@ def draw_header(draw, location_name, date_str, updated_str):
                        load_font(12), (200, 200, 200))
     draw_centered_text(draw, "10-DAY FORECAST", L["hourly_w"] + L["daily_w"] / 2,
                        L["header_h"] / 2, load_font(11), (210, 210, 210))
+
+
+def draw_hourly_panel(img, draw, hours, icons):
+    """Draw the left hourly panel. `icons` is a list of RGBA images parallel to hours."""
+    L = LAYOUT
+    n = L["num_hours"]
+    col_w = L["hourly_w"] / n
+    temp_y = L["header_h"]
+    feels_y = temp_y + L["temp_h"]
+    precip_y = feels_y + L["feels_h"]
+    uv_y = precip_y + L["precip_h"]
+    hour_y = uv_y + L["uv_h"]
+
+    temps = [h["temp_f"] for h in hours]
+    min_t, max_t = min(temps), max(temps)
+    t_range = (max_t - min_t) or 1
+
+    small = load_font(12)
+    tiny = load_font(11)
+
+    # Night shading (full panel height)
+    for i, h in enumerate(hours):
+        if not h["is_daytime"]:
+            x0 = int(i * col_w)
+            draw.rectangle([x0, L["header_h"], int(x0 + col_w), HEIGHT],
+                           fill=(225, 227, 240))
+
+    # Temperature graph: icon positioned by temp, label below
+    icon_sz = 34
+    usable = L["temp_h"] - icon_sz - 22
+    for i, h in enumerate(hours):
+        cx = i * col_w + col_w / 2
+        norm = (h["temp_f"] - min_t) / t_range
+        icon_top = temp_y + usable * (1 - norm) + 4
+        if icons[i] is not None:
+            img.paste(icons[i], (int(cx - icon_sz / 2), int(icon_top)), icons[i])
+        draw_centered_text(draw, "{}°".format(h["temp_f"]),
+                           cx, icon_top + icon_sz + 10, small, temp_color(h["temp_f"]))
+
+    # Feels-like row
+    draw.line([0, feels_y, L["hourly_w"], feels_y], fill=(180, 180, 180))
+    for i, h in enumerate(hours):
+        cx = i * col_w + col_w / 2
+        draw_centered_text(draw, "FL {}°".format(h["feels_f"]),
+                           cx, feels_y + L["feels_h"] / 2, tiny, (100, 100, 100))
+
+    # Precip probability bars
+    draw.line([0, precip_y, L["hourly_w"], precip_y], fill=(150, 150, 150))
+    for i, h in enumerate(hours):
+        cx = i * col_w + col_w / 2
+        bar_h = max(2, int((h["pop"] / 100) * (L["precip_h"] - 4)))
+        bar_top = precip_y + L["precip_h"] - bar_h
+        color = COLOR_STORM if h["thunder"] > 30 else COLOR_RAIN
+        draw.rectangle([int(i * col_w + 3), bar_top, int((i + 1) * col_w - 3),
+                        precip_y + L["precip_h"]], fill=color)
+        if h["pop"] > 0:
+            draw_centered_text(draw, "{}%".format(h["pop"]), cx, bar_top + 8,
+                               load_font(10), WHITE)
+        if h["thunder"] >= 30:
+            draw_centered_text(draw, "⚡", cx, precip_y + 8, load_font(12), YELLOW)
+
+    # UV row
+    draw.line([0, uv_y, L["hourly_w"], uv_y], fill=(150, 150, 150))
+    for i, h in enumerate(hours):
+        cx = i * col_w + col_w / 2
+        uv_col = RED if h["uv"] >= 6 else (GREEN if h["uv"] < 3 else ORANGE)
+        draw_centered_text(draw, "UV {}".format(h["uv"]), cx, uv_y + L["uv_h"] / 2,
+                           tiny, uv_col)
+
+    # Hour labels
+    draw.line([0, hour_y, L["hourly_w"], hour_y], fill=(150, 150, 150))
+    for i, h in enumerate(hours):
+        cx = i * col_w + col_w / 2
+        draw_centered_text(draw, h["ampm_label"], cx, hour_y + 14, small, BLACK)
+
+    # Vertical divider between panels
+    draw.rectangle([L["hourly_w"], 0, L["hourly_w"] + 2, HEIGHT], fill=BLACK)
