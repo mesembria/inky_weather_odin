@@ -59,6 +59,14 @@ def test_intensity_heavy():
     assert weather.intensity_level(qpf_mm=12.0, pop=90) == 3
 
 
+def test_intensity_boundary_2_5_is_moderate():
+    assert weather.intensity_level(qpf_mm=2.5, pop=80) == 2
+
+
+def test_intensity_boundary_7_5_is_heavy():
+    assert weather.intensity_level(qpf_mm=7.5, pop=80) == 3
+
+
 def test_precip_kind_dry():
     assert weather.precip_kind(pop=0, precip_type="RAIN", thunder=0) == "dry"
 
@@ -77,6 +85,14 @@ def test_precip_kind_rain():
 
 def test_precip_kind_wintry_mix():
     assert weather.precip_kind(pop=50, precip_type="SLEET", thunder=0) == "mix"
+
+
+def test_precip_kind_thunder_29_is_rain():
+    assert weather.precip_kind(pop=60, precip_type="RAIN", thunder=29) == "rain"
+
+
+def test_precip_kind_thunder_30_is_storm():
+    assert weather.precip_kind(pop=60, precip_type="RAIN", thunder=30) == "storm"
 
 
 def test_parse_hourly_returns_twelve():
@@ -131,6 +147,11 @@ def test_parse_daily_snow_day():
     snow_day = days[7]
     assert snow_day["day"]["precip_type"] == "SNOW"
     assert snow_day["hi_f"] == 33
+
+
+def test_parse_daily_tolerates_missing_display_date():
+    days = weather.parse_daily({"forecastDays": [{}]}, count=10)
+    assert days[0]["name"] == ""
 
 
 def test_hourly_url_contains_params():

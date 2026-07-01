@@ -1,9 +1,21 @@
-"""Fetch and parse Google Maps Platform Weather forecasts; pure helpers."""
+"""Fetch and parse Google Maps Platform Weather forecasts; pure helpers.
+
+parse_hourly() returns a list of dicts, each with keys:
+    hour, ampm_label, is_daytime, condition, icon_uri, temp_f, feels_f,
+    pop, precip_type, thunder, uv
+parse_daily() returns a list of dicts, each with keys:
+    name, icon_uri, hi_f, lo_f, day, night
+    where day/night are dicts with keys: pop, precip_type, qpf_mm, thunder
+"""
 
 import datetime
 import json
 import os
+from urllib.parse import urlencode
+
 import requests
+
+_DRY_POP_THRESHOLD = 5
 
 
 def c_to_f(celsius):
@@ -26,7 +38,7 @@ def intensity_level(qpf_mm, pop):
     0 = none/dry, 1 = light (<2.5mm), 2 = moderate (2.5-7.5mm), 3 = heavy (>7.5mm).
     Returns 0 when there is effectively no precip chance or no accumulation.
     """
-    if pop < 5 or qpf_mm <= 0:
+    if pop < _DRY_POP_THRESHOLD or qpf_mm <= 0:
         return 0
     if qpf_mm < 2.5:
         return 1
@@ -41,7 +53,7 @@ def precip_kind(pop, precip_type, thunder):
     Returns one of: 'dry', 'storm', 'snow', 'mix', 'rain'.
     Thunderstorm dominance (>=30%) takes priority over type.
     """
-    if pop < 5:
+    if pop < _DRY_POP_THRESHOLD:
         return "dry"
     if thunder >= 30:
         return "storm"
@@ -57,17 +69,15 @@ _DAILY_ENDPOINT = "https://weather.googleapis.com/v1/forecast/days:lookup"
 
 
 def hourly_url(lat, long, key, hours=12):
-    return (
-        "{base}?key={key}&location.latitude={lat}&location.longitude={long}"
-        "&hours={hours}&unitsSystem=METRIC"
-    ).format(base=_HOURLY_ENDPOINT, key=key, lat=lat, long=long, hours=hours)
+    params = {"key": key, "location.latitude": lat, "location.longitude": long,
+              "hours": hours, "unitsSystem": "METRIC"}
+    return "{}?{}".format(_HOURLY_ENDPOINT, urlencode(params))
 
 
 def daily_url(lat, long, key, days=10):
-    return (
-        "{base}?key={key}&location.latitude={lat}&location.longitude={long}"
-        "&days={days}&unitsSystem=METRIC"
-    ).format(base=_DAILY_ENDPOINT, key=key, lat=lat, long=long, days=days)
+    params = {"key": key, "location.latitude": lat, "location.longitude": long,
+              "days": days, "unitsSystem": "METRIC"}
+    return "{}?{}".format(_DAILY_ENDPOINT, urlencode(params))
 
 
 def fetch_live(lat, long, key, hours=12, days=10, timeout=20):
@@ -95,7 +105,9 @@ _WEEKDAY = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
 
 
 def _day_name(display_date):
-    """Return a 3-letter weekday from a Google displayDate dict."""
+    """Return a 3-letter weekday from a Google displayDate dict, or '' if missing."""
+    if not display_date:
+        return ""
     d = datetime.date(display_date["year"], display_date["month"], display_date["day"])
     return _WEEKDAY[d.weekday()]
 
@@ -123,7 +135,7 @@ def parse_daily(data, count=10):
         night_block = obj.get("nighttimeForecast", {})
         cond = day_block.get("weatherCondition", {})
         days.append({
-            "name": _day_name(obj["displayDate"]),
+            "name": _day_name(obj.get("displayDate", {})),
             "icon_uri": cond.get("iconBaseUri", ""),
             "hi_f": c_to_f(obj.get("maxTemperature", {}).get("degrees", 0)),
             "lo_f": c_to_f(obj.get("minTemperature", {}).get("degrees", 0)),
