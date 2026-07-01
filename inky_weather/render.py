@@ -57,3 +57,11 @@ def load_font(size):
         except OSError:
             continue
     return ImageFont.load_default()
+
+
+def draw_centered_text(draw, text, cx, cy, font, color):
+    """Draw text horizontally centered on cx and vertically centered on cy."""
+    bbox = draw.textbbox((0, 0), text, font=font)
+    w = bbox[2] - bbox[0]
+    h = bbox[3] - bbox[1]
+    draw.text((cx - w / 2 - bbox[0], cy - h / 2 - bbox[1]), text, font=font, fill=color)

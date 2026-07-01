@@ -21,3 +21,10 @@ def test_temp_color_hot_is_red_ish():
 def test_load_font_returns_font():
     f = render.load_font(14)
     assert hasattr(f, "getbbox")
+
+
+def test_draw_centered_text_runs():
+    img = Image.new("RGB", (100, 40), (255, 255, 255))
+    d = ImageDraw.Draw(img)
+    render.draw_centered_text(d, "Hi", 50, 20, render.load_font(14), (0, 0, 0))
+    assert img.tobytes() != Image.new("RGB", (100, 40), (255, 255, 255)).tobytes()
