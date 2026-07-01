@@ -65,3 +65,18 @@ def draw_centered_text(draw, text, cx, cy, font, color):
     w = bbox[2] - bbox[0]
     h = bbox[3] - bbox[1]
     draw.text((cx - w / 2 - bbox[0], cy - h / 2 - bbox[1]), text, font=font, fill=color)
+
+
+# Layout geometry (pixels). Hourly zones (below header) sum to HEIGHT.
+LAYOUT = {
+    "header_h": 30,
+    "temp_h": 250,
+    "feels_h": 18,
+    "precip_h": 80,
+    "uv_h": 22,
+    "hour_h": 80,          # 30+250+18+80+22+80 = 480
+    "daily_w": 215,
+    "hourly_w": WIDTH - 215,
+    "num_hours": 12,
+    "num_days": 10,
+}

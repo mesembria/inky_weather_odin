@@ -28,3 +28,15 @@ def test_draw_centered_text_runs():
     d = ImageDraw.Draw(img)
     render.draw_centered_text(d, "Hi", 50, 20, render.load_font(14), (0, 0, 0))
     assert img.tobytes() != Image.new("RGB", (100, 40), (255, 255, 255)).tobytes()
+
+
+def test_layout_zones_sum_to_height():
+    L = render.LAYOUT
+    total = (L["header_h"] + L["temp_h"] + L["feels_h"]
+             + L["precip_h"] + L["uv_h"] + L["hour_h"])
+    assert total == render.HEIGHT
+
+
+def test_layout_widths():
+    L = render.LAYOUT
+    assert L["hourly_w"] + L["daily_w"] == render.WIDTH
