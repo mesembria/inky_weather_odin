@@ -37,3 +37,23 @@ def test_hour_label_morning():
 
 def test_hour_label_evening():
     assert weather.hour_label(15) == "3P"
+
+
+def test_intensity_dry_when_no_pop():
+    assert weather.intensity_level(qpf_mm=5.0, pop=0) == 0
+
+
+def test_intensity_dry_when_no_qpf():
+    assert weather.intensity_level(qpf_mm=0.0, pop=80) == 0
+
+
+def test_intensity_light():
+    assert weather.intensity_level(qpf_mm=1.0, pop=60) == 1
+
+
+def test_intensity_moderate():
+    assert weather.intensity_level(qpf_mm=5.0, pop=80) == 2
+
+
+def test_intensity_heavy():
+    assert weather.intensity_level(qpf_mm=12.0, pop=90) == 3

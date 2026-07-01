@@ -18,3 +18,18 @@ def hour_label(hour):
     if h12 == 0:
         h12 = 12
     return "{}{}".format(h12, suffix)
+
+
+def intensity_level(qpf_mm, pop):
+    """Map precip amount (mm) to pip level 0-3.
+
+    0 = none/dry, 1 = light (<2.5mm), 2 = moderate (2.5-7.5mm), 3 = heavy (>7.5mm).
+    Returns 0 when there is effectively no precip chance or no accumulation.
+    """
+    if pop < 5 or qpf_mm <= 0:
+        return 0
+    if qpf_mm < 2.5:
+        return 1
+    if qpf_mm < 7.5:
+        return 2
+    return 3
