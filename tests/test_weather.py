@@ -104,3 +104,30 @@ def test_parse_hourly_handles_short_list():
     data = {"forecastHours": _load_fixture("hourly_response.json")["forecastHours"][:3]}
     hours = weather.parse_hourly(data, count=12)
     assert len(hours) == 3
+
+
+def test_parse_daily_returns_ten():
+    data = _load_fixture("daily_response.json")
+    days = weather.parse_daily(data, count=10)
+    assert len(days) == 10
+
+
+def test_parse_daily_first_day_fields():
+    data = _load_fixture("daily_response.json")
+    first = weather.parse_daily(data, count=10)[0]
+    assert first["name"] == "TUE"
+    assert first["hi_f"] == 84
+    assert first["lo_f"] == 60
+    assert first["day"]["pop"] == 50
+    assert first["day"]["thunder"] == 55
+    assert first["day"]["qpf_mm"] == 2.0
+    assert first["night"]["pop"] == 10
+    assert first["icon_uri"].endswith("/thunderstorm")
+
+
+def test_parse_daily_snow_day():
+    data = _load_fixture("daily_response.json")
+    days = weather.parse_daily(data, count=10)
+    snow_day = days[7]
+    assert snow_day["day"]["precip_type"] == "SNOW"
+    assert snow_day["hi_f"] == 33

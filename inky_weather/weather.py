@@ -52,6 +52,48 @@ def precip_kind(pop, precip_type, thunder):
     return "rain"
 
 
+_WEEKDAY = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+
+
+def _day_name(display_date):
+    """Return a 3-letter weekday from a Google displayDate dict."""
+    d = datetime.date(display_date["year"], display_date["month"], display_date["day"])
+    return _WEEKDAY[d.weekday()]
+
+
+def _parse_precip_block(block):
+    """Extract precip fields from a daytimeForecast/nighttimeForecast object."""
+    precip = block.get("precipitation", {})
+    prob = precip.get("probability", {})
+    return {
+        "pop": prob.get("percent", 0),
+        "precip_type": prob.get("type", "RAIN"),
+        "qpf_mm": precip.get("qpf", {}).get("quantity", 0.0),
+        "thunder": block.get("thunderstormProbability", 0),
+    }
+
+
+def parse_daily(data, count=10):
+    """Extract the first `count` days from a Google daily response.
+
+    Returns a list of dicts (see module docstring for shape).
+    """
+    days = []
+    for obj in data.get("forecastDays", [])[:count]:
+        day_block = obj.get("daytimeForecast", {})
+        night_block = obj.get("nighttimeForecast", {})
+        cond = day_block.get("weatherCondition", {})
+        days.append({
+            "name": _day_name(obj["displayDate"]),
+            "icon_uri": cond.get("iconBaseUri", ""),
+            "hi_f": c_to_f(obj.get("maxTemperature", {}).get("degrees", 0)),
+            "lo_f": c_to_f(obj.get("minTemperature", {}).get("degrees", 0)),
+            "day": _parse_precip_block(day_block),
+            "night": _parse_precip_block(night_block),
+        })
+    return days
+
+
 def parse_hourly(data, count=12):
     """Extract the first `count` hours from a Google hourly response.
 
