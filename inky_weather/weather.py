@@ -52,6 +52,45 @@ def precip_kind(pop, precip_type, thunder):
     return "rain"
 
 
+_HOURLY_ENDPOINT = "https://weather.googleapis.com/v1/forecast/hours:lookup"
+_DAILY_ENDPOINT = "https://weather.googleapis.com/v1/forecast/days:lookup"
+
+
+def hourly_url(lat, long, key, hours=12):
+    return (
+        "{base}?key={key}&location.latitude={lat}&location.longitude={long}"
+        "&hours={hours}&unitsSystem=METRIC"
+    ).format(base=_HOURLY_ENDPOINT, key=key, lat=lat, long=long, hours=hours)
+
+
+def daily_url(lat, long, key, days=10):
+    return (
+        "{base}?key={key}&location.latitude={lat}&location.longitude={long}"
+        "&days={days}&unitsSystem=METRIC"
+    ).format(base=_DAILY_ENDPOINT, key=key, lat=lat, long=long, days=days)
+
+
+def fetch_live(lat, long, key, hours=12, days=10, timeout=20):
+    """Fetch and parse both forecasts from the live API. Returns (hours, days)."""
+    hourly_resp = requests.get(hourly_url(lat, long, key, hours), timeout=timeout)
+    hourly_resp.raise_for_status()
+    daily_resp = requests.get(daily_url(lat, long, key, days), timeout=timeout)
+    daily_resp.raise_for_status()
+    return (
+        parse_hourly(hourly_resp.json(), count=hours),
+        parse_daily(daily_resp.json(), count=days),
+    )
+
+
+def load_from_fixtures(fixture_dir, hours=12, days=10):
+    """Load and parse both forecasts from local fixture files. Returns (hours, days)."""
+    with open(os.path.join(fixture_dir, "hourly_response.json")) as f:
+        hourly = json.load(f)
+    with open(os.path.join(fixture_dir, "daily_response.json")) as f:
+        daily = json.load(f)
+    return parse_hourly(hourly, count=hours), parse_daily(daily, count=days)
+
+
 _WEEKDAY = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
 
 

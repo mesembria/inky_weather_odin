@@ -131,3 +131,24 @@ def test_parse_daily_snow_day():
     snow_day = days[7]
     assert snow_day["day"]["precip_type"] == "SNOW"
     assert snow_day["hi_f"] == 33
+
+
+def test_hourly_url_contains_params():
+    url = weather.hourly_url(lat="37.2", long="-80.0", key="ABC", hours=12)
+    assert "location.latitude=37.2" in url
+    assert "location.longitude=-80.0" in url
+    assert "hours=12" in url
+    assert "key=ABC" in url
+
+
+def test_daily_url_contains_params():
+    url = weather.daily_url(lat="37.2", long="-80.0", key="ABC", days=10)
+    assert "days=10" in url
+    assert "key=ABC" in url
+
+
+def test_load_fixtures_returns_parsed():
+    hours, days = weather.load_from_fixtures(FIXTURE_DIR)
+    assert len(hours) == 12
+    assert len(days) == 10
+    assert hours[0]["temp_f"] == 76
