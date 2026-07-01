@@ -230,3 +230,29 @@ def draw_daily_row(img, draw, day, y, row_h, icon, global_lo, global_hi):
     p_track_w = content_w - 70
     _draw_precip_bar(draw, content_x, y + 18, p_track_w, "D", day["day"], tiny)
     _draw_precip_bar(draw, content_x, y + 31, p_track_w, "N", day["night"], tiny)
+
+
+def draw_daily_strip(img, draw, days, icons):
+    """Draw all daily rows in the right strip using a shared temperature scale."""
+    L = LAYOUT
+    strip_x = L["hourly_w"] + 2
+    strip_w = L["daily_w"] - 2
+    row_h = (HEIGHT - L["header_h"]) / len(days)
+    global_lo = min(d["lo_f"] for d in days)
+    global_hi = max(d["hi_f"] for d in days)
+    for i, day in enumerate(days):
+        y = int(L["header_h"] + i * row_h)
+        if i > 0:
+            draw.line([strip_x, y, strip_x + strip_w, y], fill=(205, 200, 186))
+        draw_daily_row(img, draw, day, y, row_h, icons[i], global_lo, global_hi)
+
+
+def render_display(hours, days, hour_icons, day_icons,
+                   location_name, date_str, updated_str):
+    """Compose the full 800x480 image. Returns an RGB PIL Image."""
+    img = Image.new("RGB", (WIDTH, HEIGHT), PAPER)
+    draw = ImageDraw.Draw(img)
+    draw_hourly_panel(img, draw, hours, hour_icons)
+    draw_daily_strip(img, draw, days, day_icons)
+    draw_header(draw, location_name, date_str, updated_str)
+    return img

@@ -97,3 +97,18 @@ def test_draw_daily_row_runs():
         for y in range(40, 85, 5)
     )
     assert changed
+
+
+def test_render_display_returns_image():
+    hours = _sample_hours()
+    days = _sample_days()
+    hour_icons = [Image.new("RGBA", (34, 34), (0, 0, 0, 0))] * len(hours)
+    day_icons = [Image.new("RGBA", (26, 26), (0, 0, 0, 0))] * len(days)
+    img = render.render_display(
+        hours, days, hour_icons, day_icons,
+        location_name="Blacksburg, VA", date_str="Tue Jun 30", updated_str="10:02 AM",
+    )
+    assert img.size == (render.WIDTH, render.HEIGHT)
+    L = render.LAYOUT
+    assert any(img.getpixel((L["hourly_w"] + 30, y)) != render.PAPER
+               for y in range(render.HEIGHT))
