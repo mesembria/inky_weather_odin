@@ -253,6 +253,18 @@ def draw_daily_strip(img, draw, days, icons):
         draw_daily_row(img, draw, day, y, row_h, icons[i], global_lo, global_hi)
 
 
+def render_error(message):
+    """Render a simple full-screen error card so failures are visible on-panel."""
+    img = Image.new("RGB", (WIDTH, HEIGHT), PAPER)
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([0, 0, WIDTH, LAYOUT["header_h"]], fill=RED)
+    draw.text((10, 7), "Weather update failed", font=load_font(15), fill=WHITE)
+    draw_centered_text(draw, message, WIDTH / 2, HEIGHT / 2, load_font(18), BLACK)
+    draw_centered_text(draw, "Will retry next hour", WIDTH / 2, HEIGHT / 2 + 34,
+                       load_font(13), (110, 110, 110))
+    return img
+
+
 def render_display(hours, days, hour_icons, day_icons,
                    location_name, date_str, updated_str):
     """Compose the full 800x480 image. Returns an RGB PIL Image."""

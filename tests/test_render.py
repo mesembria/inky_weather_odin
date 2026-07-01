@@ -112,3 +112,10 @@ def test_render_display_returns_image():
     L = render.LAYOUT
     assert any(img.getpixel((L["hourly_w"] + 30, y)) != render.PAPER
                for y in range(render.HEIGHT))
+
+
+def test_render_error_card_returns_image():
+    img = render.render_error("No network: fetch failed")
+    assert img.size == (render.WIDTH, render.HEIGHT)
+    assert any(img.getpixel((x, render.HEIGHT // 2)) != render.PAPER
+               for x in range(0, render.WIDTH, 10))
