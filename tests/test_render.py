@@ -16,3 +16,8 @@ def test_kind_color_known_kinds():
 def test_temp_color_hot_is_red_ish():
     r, g, b = render.temp_color(95)
     assert r > b
+
+
+def test_load_font_returns_font():
+    f = render.load_font(14)
+    assert hasattr(f, "getbbox")

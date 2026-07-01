@@ -40,3 +40,20 @@ def temp_color(temp_f):
     if temp_f >= 60:
         return BLACK
     return BLUE
+
+
+_FONT_CANDIDATES = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+    "/Library/Fonts/Arial Bold.ttf",
+]
+
+
+def load_font(size):
+    """Load a bold TrueType font at the given size, falling back to default."""
+    for path in _FONT_CANDIDATES:
+        try:
+            return ImageFont.truetype(path, size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
