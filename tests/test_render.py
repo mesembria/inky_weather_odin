@@ -119,3 +119,10 @@ def test_render_error_card_returns_image():
     assert img.size == (render.WIDTH, render.HEIGHT)
     assert any(img.getpixel((x, render.HEIGHT // 2)) != render.PAPER
                for x in range(0, render.WIDTH, 10))
+
+
+def test_draw_bolt_marks_pixels():
+    img = Image.new("RGB", (30, 30), (255, 255, 255))
+    d = ImageDraw.Draw(img)
+    render.draw_bolt(d, 5, 5, 16, (230, 120, 0))
+    assert img.tobytes() != Image.new("RGB", (30, 30), (255, 255, 255)).tobytes()

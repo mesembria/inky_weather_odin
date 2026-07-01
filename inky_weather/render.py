@@ -71,6 +71,24 @@ def draw_centered_text(draw, text, cx, cy, font, color):
     draw.text((cx - w / 2 - bbox[0], cy - h / 2 - bbox[1]), text, font=font, fill=color)
 
 
+def draw_bolt(draw, x, y, size, color):
+    """Draw a small lightning-bolt glyph in a size x size box at top-left (x, y).
+
+    Used instead of the unicode bolt emoji, which the TrueType fonts don't cover.
+    """
+    w = h = size
+    pts = [
+        (x + 0.55 * w, y),
+        (x + 0.20 * w, y + 0.55 * h),
+        (x + 0.45 * w, y + 0.55 * h),
+        (x + 0.30 * w, y + h),
+        (x + 0.80 * w, y + 0.40 * h),
+        (x + 0.52 * w, y + 0.40 * h),
+        (x + 0.70 * w, y),
+    ]
+    draw.polygon(pts, fill=color)
+
+
 # Layout geometry (pixels). Hourly zones (below header) sum to HEIGHT.
 LAYOUT = {
     "header_h": 30,
@@ -160,7 +178,7 @@ def draw_hourly_panel(img, draw, hours, icons):
             draw_centered_text(draw, "{}%".format(h["pop"]), cx, bar_top + 8,
                                pct_font, WHITE)
         if h["thunder"] >= 30:
-            draw_centered_text(draw, "⚡", cx, precip_y + 8, small, YELLOW)
+            draw_bolt(draw, cx - 5, precip_y + 3, 11, ORANGE)
 
     # UV row
     draw.line([0, uv_y, L["hourly_w"], uv_y], fill=(150, 150, 150))
@@ -195,8 +213,8 @@ def _draw_precip_bar(draw, x, y, track_w, label, cell, font_tiny):
               font=font_tiny, fill=(70, 70, 70) if fill_w < track_w * 0.55 else WHITE)
     mx = tx + track_w + 4
     if cell["thunder"] >= 30:
-        draw.text((mx, y), "⚡", font=font_tiny, fill=ORANGE)
-        mx += 10
+        draw_bolt(draw, mx, y + 2, 10, ORANGE)
+        mx += 12
     level = weather.intensity_level(cell["qpf_mm"], cell["pop"])
     for p in range(3):
         pc = color if p < level else (216, 210, 196)
