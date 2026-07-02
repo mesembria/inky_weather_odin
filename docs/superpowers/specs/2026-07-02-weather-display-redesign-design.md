@@ -39,7 +39,8 @@ cards** (the verdict) with a **rich ensemble graph** (the evidence).
 | Source | Role |
 |---|---|
 | **Google Maps Platform Weather API** (existing) | Deterministic hourly forecast: temp, feels-like, precip probability & type, thunderstorm probability, UV, condition + **official condition icons** (`iconBaseUri`). Drives the "expected" line, the advice logic, and the per-hour icons. |
-| **Open-Meteo Ensemble API** (new) | GEFS ensemble members (hourly, free for non-commercial use, no API key). Drives the **temperature spread band** and the **precip spread**, plus the **confidence badge**. Endpoint: `https://api.open-meteo.com/v1/ensemble` with `models=gfs_seamless`, `hourly=temperature_2m,precipitation_probability` (or `precipitation`). |
+| **Open-Meteo Ensemble API** (new) | GEFS ensemble members (hourly, free for non-commercial use, no API key). Drives the **temperature spread band** and the **precip spread**, plus the **confidence badge**. Endpoint: `https://api.open-meteo.com/v1/ensemble` with `models=gfs_seamless`, `hourly=temperature_2m,precipitation_probability` (or `precipitation`). Also supplies **`wind_gusts_10m`** for the WIND card (deterministic Open-Meteo forecast, same request family). |
+| **Open-Meteo Air-Quality API** (new) | US AQI for the SMOKE/AQI card (wildfire season). Endpoint: `https://air-quality-api.open-meteo.com/v1/air-quality` with `hourly=us_aqi`. **Confirmed worth the extra call.** |
 
 Google's public API is powered by an ensemble model (WeatherNext 2) but only exposes
 deterministic values + a probability — not raw members — hence the second source for spread.
@@ -65,36 +66,51 @@ ensemble bands room to read, which matters most for the data-geek half.
 
 ## 5. Advice Cards — the 3-slot adaptive system
 
-**Model:** there is a *pool* of card types. Every refresh, each eligible card computes a
-**priority score**; the top 3 fill the slots, rendered left→right in a stable display order.
-This keeps the display relevant (morning shows dress/rain/UV; a stormy afternoon shows
-storms/rain/dress; an evening shows overnight/etc.).
+**Model (validated against 7 scenarios):**
 
-**Card pool** (all confirmed in scope):
+- **Slot 1 is always a temperature / "what to wear" card** (DRESS and its variants). It always
+  carries the day's temp range, so the wear-decision is never crowded out.
+- **Slots 2–3 are the top-scoring *situational* cards.** Each eligible situational card computes
+  a **priority score**; the two highest fill the remaining slots, rendered left→right by score.
 
-| Card | Triggers when | Example verdict / detail |
+This kept the display relevant across every test: Phoenix → heat / UV / warm-night; Denver →
+bundle-up / snow / wind; Seattle → cool-damp / wet-window / overnight; Sacramento → hot /
+smoke / warm-night; Chicago → cool / gusty / turning-colder; plus the two original storm days.
+
+**Slot 1 — temperature card (first-draft bands):**
+
+| Condition | Verdict | Detail |
 |---|---|---|
-| DRESS | always eligible (core) | `Warm, cools late` · `63–81° · humid AM` |
-| RAIN / OUTDOORS | rain in window (core) | `Morning window` · `Dry till 12p · wet 12–4p` |
-| STORMS | thunderstorm prob ≥ threshold | `T-storms 2p` · `65% · brief, heavy` |
-| OVERNIGHT | evening refresh + night hours ahead | `Open tonight` · `Low 65° · clear & dry` |
-| SNOW | snow in precip type/amount | `Snow after 12a` · `2–4"` |
-| WIND | gusts over threshold | `Breezy` · `Gusts 25 mph pm` |
-| SMOKE / AQI | AQI over threshold (wildfire season) | `Hazy` · `AQI 130 · limit exertion` |
-| UV / SUN | UV index ≥ threshold, no bigger hazard | `Strong UV` · `Index 7 midday · hat + SPF` |
-| SWING | ensemble spread wide | `Could be 78–88°` · `models disagree pm` |
-| TREND | notable warmer/cooler vs today | `Cooler than today` · `−8° by evening` |
+| low ≤ 32° | `Bundle up` | `20–30° · frost` |
+| hi ≥ 100° | `Dangerous heat` | `90–112° · hydrate, shade` |
+| hi ≥ 90° | `Hot` | `80–98° · UV n, shade` |
+| hi ≥ 80° | `Warm, cools late` | `63–81° · muggy/pleasant` |
+| hi ≥ 62° | `Mild` | `52–61° · easy layers` |
+| else | `Cool` / `Cool & damp` | `47–54° · layers` |
 
-**Confidence** is a header badge, not a card (derived from mean ensemble band width).
+**Slots 2–3 — situational cards (first-draft triggers & scores; higher wins):**
 
-**Vocabulary & thresholds are intentionally first-draft here** and will be worked through in
-detail as the first implementation step (this is the "make or break" layer). Thresholds live
-in `config.py` so wording/cutoffs can be tuned after living with the display. Priority scoring
-(how a 65%-storm outranks a UV card, etc.) is part of that detailed pass.
+| Card | Trigger | Score | Verdict / detail |
+|---|---|---|---|
+| SNOW | precip type = snow, pop ≥ 30 | 95 | `Snow all day` · `6" likely · roads slick` |
+| STORMS | thunder ≥ 45 / 25 | 90 / 68 | `T-storms 2p` · `65% · brief, heavy` |
+| SMOKE | US AQI ≥ 150 / 100 | 88 / 64 | `Unhealthy air` · `AQI 168 · stay indoors` |
+| WIND | gusts ≥ 35 / 25 | 80 / 56 | `Gusty` · `Gusts 45 mph · secure loose items` |
+| OUTDOORS/RAIN | pop ≥ 50 (non-snow) | 72 | `Wet window` · `Rain 8a–12p` |
+| UV / SUN | UV ≥ 9 / 6 | 60 / 44 | `Extreme UV` · `Index 11 · cover up` |
+| TREND | cools ≥ 12° **and** late low ≤ 65° | 58 | `Turning colder` · `58°→39° by evening` |
+| OVERNIGHT | night hours ahead | 50 | `Open tonight` / `Warm night` / `Cold night` / `Storms overnight` (by low & storm risk) |
+| (fallback) | nothing else triggers | 30 | `Great window` · `Clear & calm ahead` |
+| SWING | ensemble p10–p90 wide | tbd | `Could be 78–88°` · `models disagree pm` |
 
-WIND, SMOKE/AQI require fields not in the current Google parse; they come from Open-Meteo
-(`wind_gusts_10m`) and Open-Meteo Air-Quality API respectively. If a field is unavailable, the
-card is simply ineligible.
+Notes from the workshop pass: TREND must be gated on the late low actually being cool (else a
+112°→90° afternoon wrongly reads as "colder"); OVERNIGHT branches by low (`≤45` cold/heat-on,
+`≤68` open, `≥70` warm/stuffy) and by overnight storm risk. **Confidence** is a header badge,
+not a card (from mean band width). SWING scoring is still open.
+
+These bands/scores/wording live in `config.py` so they can be tuned after living with the
+display — this is the "make or break" layer and is expected to keep evolving. If a data field
+is unavailable (e.g. Open-Meteo down), the dependent card is simply ineligible.
 
 ## 6. The Ensemble Graph
 
@@ -120,15 +136,16 @@ Full-width temperature graph with a precip strip along the bottom.
 - **X axis.** AM/PM hour labels.
 
 Known polish items for implementation: bottom gridline label can collide with the `RAIN %`
-caption; near-zero precip bars shrink to specks (clamp a minimum).
+caption; near-zero precip bars must draw nothing below ~5% pop (phantom-bar fix already proven
+in the mockups). Snow precip bars are colored purple, storm bars red, rain bars blue.
 
 ## 7. Typography & Color
 
-- **Display face:** a condensed grotesque (mockups use *DIN Condensed Bold*). DIN Condensed is
-  a macOS system font and is **not** on the Raspberry Pi (DejaVu only), so we must **bundle an
-  open-license condensed face** in `inky_weather/assets/fonts/` (e.g. Barlow Semi Condensed,
-  Saira Condensed, or Oswald) and load it explicitly. Body/label text: a narrow sans (Arial
-  Narrow in mockups → bundled equivalent).
+- **Display face: Oswald (SemiBold / weight 600), confirmed.** OFL-licensed, so we **bundle
+  `Oswald` in `inky_weather/assets/fonts/`** and load it explicitly (the Raspberry Pi has only
+  DejaVu). Used for the location header, card category labels, card verdicts, and the graph's
+  temp numerals/gridline labels. Body/detail text stays a plain narrow sans (Arial Narrow in
+  mockups → a bundled equivalent such as DejaVuSansCondensed on the Pi).
 - **Palette:** the existing 7-color constants. Accents used sparingly and semantically: red =
   hot/storm, orange = warm/caution, blue = cool/rain, green = good/comfortable, ink = neutral.
   Ensemble bands are light blue-grays that quantize acceptably on the panel.
@@ -167,7 +184,15 @@ logic; multi-day may return later as a TREND card but not as a strip.
 
 ## 10. Open Items (resolved during implementation, not blocking this spec)
 
-1. Advice vocabulary, thresholds, and priority scoring — detailed pass, config-driven.
+1. Advice vocabulary, thresholds, and priority scoring — **first draft in §5** (validated over 7
+   scenarios); refined and moved into `config.py` during implementation.
 2. Precip bar style (floating vs grounded) — chosen on the real panel.
-3. Bundled condensed font choice + license.
+3. ~~Bundled display font~~ — **resolved: Oswald (OFL).**
 4. Exact Open-Meteo request shape and whether to store raw members or precomputed percentiles.
+5. SWING card scoring (when a wide ensemble earns a slot vs. just widening the band).
+
+## 11. Reference Mockups
+
+Committed under `docs/design/` (real 800×480 renders in the 7-color palette, Oswald face):
+`redesign-mock-storm.png`, `redesign-mock-hot.png`, and the workshop set
+`loc-phoenix/denver/seattle/sacramento/chicago.png`.
