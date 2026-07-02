@@ -1,5 +1,8 @@
 import json
 import os
+from unittest import mock
+
+import pytest
 
 from inky_weather import weather
 
@@ -173,3 +176,35 @@ def test_load_fixtures_returns_parsed():
     assert len(hours) == 12
     assert len(days) == 10
     assert hours[0]["temp_f"] == 76
+
+
+def test_raise_for_api_error_passes_when_ok():
+    weather._raise_for_api_error(mock.Mock(ok=True))  # should not raise
+
+
+def test_raise_for_api_error_uses_google_message():
+    resp = mock.Mock(ok=False, status_code=400)
+    resp.json.return_value = {"error": {"message": "Invalid value at 'location.longitude'"}}
+    with pytest.raises(weather.WeatherAPIError) as exc:
+        weather._raise_for_api_error(resp)
+    assert "400" in str(exc.value)
+    assert "location.longitude" in str(exc.value)
+
+
+def test_raise_for_api_error_falls_back_to_text_when_no_json():
+    resp = mock.Mock(ok=False, status_code=503, text="Service Unavailable",
+                     reason="Service Unavailable")
+    resp.json.side_effect = ValueError("no json")
+    with pytest.raises(weather.WeatherAPIError) as exc:
+        weather._raise_for_api_error(resp)
+    assert "503" in str(exc.value)
+    assert "Service Unavailable" in str(exc.value)
+
+
+def test_fetch_live_raises_weather_api_error_with_message():
+    resp = mock.Mock(ok=False, status_code=400)
+    resp.json.return_value = {"error": {"message": "Invalid value at 'location.longitude'"}}
+    with mock.patch("inky_weather.weather.requests.get", return_value=resp):
+        with pytest.raises(weather.WeatherAPIError) as exc:
+            weather.fetch_live("40.0", "--105.1", "KEY")
+    assert "location.longitude" in str(exc.value)

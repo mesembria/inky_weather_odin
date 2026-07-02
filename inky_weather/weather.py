@@ -80,12 +80,34 @@ def daily_url(lat, long, key, days=10):
     return "{}?{}".format(_DAILY_ENDPOINT, urlencode(params))
 
 
+class WeatherAPIError(Exception):
+    """Raised on a non-OK Weather API response, carrying the API's own message."""
+
+
+def _raise_for_api_error(resp):
+    """Raise WeatherAPIError with the API's own error text on a non-OK response.
+
+    Google returns a JSON body like {"error": {"message": "..."}} on 4xx/5xx.
+    Surfacing that message (rather than requests' generic "400 Client Error")
+    makes failures actionable on the error card and in the cron log.
+    """
+    if resp.ok:
+        return
+    try:
+        detail = resp.json().get("error", {}).get("message", "")
+    except ValueError:
+        detail = ""
+    if not detail:
+        detail = (getattr(resp, "text", "") or getattr(resp, "reason", "") or "").strip()[:200]
+    raise WeatherAPIError("Weather API {} error: {}".format(resp.status_code, detail))
+
+
 def fetch_live(lat, long, key, hours=12, days=10, timeout=20):
     """Fetch and parse both forecasts from the live API. Returns (hours, days)."""
     hourly_resp = requests.get(hourly_url(lat, long, key, hours), timeout=timeout)
-    hourly_resp.raise_for_status()
+    _raise_for_api_error(hourly_resp)
     daily_resp = requests.get(daily_url(lat, long, key, days), timeout=timeout)
-    daily_resp.raise_for_status()
+    _raise_for_api_error(daily_resp)
     return (
         parse_hourly(hourly_resp.json(), count=hours),
         parse_daily(daily_resp.json(), count=days),
