@@ -108,12 +108,15 @@ Full-width temperature graph with a precip strip along the bottom.
 - **Temperature scale.** Faint horizontal **gridlines with °F labels** in a left gutter, so
   the band's magnitude is readable without per-hour band numbers.
 - **Condition icons.** Google's official icon for **every hour**, in a row above the plot.
+- **No explainer caption.** The `band = ensemble …` text in the mockups is an annotation for
+  review only; the real render omits it (at most a small one-line legend, TBD).
 - **Precip strip (bottom ~54px).** Per-hour rain chance with ensemble spread. **Two candidate
   styles, to be chosen during implementation on the real panel:**
   - *Floating box-plot* — light bar p10–p90, solid core p25–p75, median tick. Honest about the
     lower bound; can look odd floating off the baseline.
   - *Grounded + cap* — solid to median, faint cap to p90, grounded at 0. Intuitive; upside only.
-  Storm hours color the bar red instead of blue.
+  Storm hours color the bar red instead of blue. **The median % is labeled on every bar**
+  (the number must stay readable — this was the whole point of the strip).
 - **X axis.** AM/PM hour labels.
 
 Known polish items for implementation: bottom gridline label can collide with the `RAIN %`
