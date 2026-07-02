@@ -34,7 +34,7 @@ Maps Platform Weather forecasts and renders a 12-hour hourly panel plus a
 ## Schedule (hourly refresh)
 Add to crontab (`crontab -e`), using the venv's Python:
 ```
-0 * * * * cd /home/pi/magtag_weather_odin && /home/pi/magtag_weather_odin/.venv/bin/python -m inky_weather.main >> /home/pi/weather.log 2>&1
+0 * * * * cd /home/pi/inky_weather_odin && /home/pi/inky_weather_odin/.venv/bin/python -m inky_weather.main >> /home/pi/weather.log 2>&1
 ```
 
 ## Development (on a Mac)
