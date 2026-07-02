@@ -38,10 +38,14 @@ Add to crontab (`crontab -e`), using the venv's Python:
 ```
 
 ## Development (on a Mac)
+Use a virtualenv (Homebrew/system Python blocks global `pip install` under
+PEP 668 — the `externally-managed-environment` error):
 ```bash
-pip install Pillow requests pytest
+python3 -m venv .venv && source .venv/bin/activate
+pip install Pillow requests pytest      # NOT inky — it needs Pi-only GPIO libs
 python3 -m pytest -v
 python3 -m inky_weather.main --fixture --out fixture.out.png
 ```
 The `inky` library is only needed on the Pi; it is imported lazily so tests and
-`--out` rendering work without it.
+`--out` rendering work without it. On the Pi, install everything with
+`pip install -r requirements.txt` inside the venv (see Setup above).
