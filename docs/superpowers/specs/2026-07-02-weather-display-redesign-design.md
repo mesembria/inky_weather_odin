@@ -84,8 +84,21 @@ smoke / warm-night; Chicago → cool / gusty / turning-colder; plus the two orig
 | low ≤ 32° | `Bundle up` | `20–30° · frost` |
 | hi ≥ 100° | `Dangerous heat` | `90–112° · hydrate, shade` |
 | hi ≥ 90° | `Hot` | `80–98° · UV n, shade` |
-| hi ≥ 80° | `Warm, cools late` | `63–81° · muggy/pleasant` |
+| hi ≥ 80° | **verified trend, see below** | — |
 | hi ≥ 62° | `Mild` | `52–61° · easy layers` |
+
+**Warm band (hi ≥ 80°) — verdict is chosen from the actual trajectory, never asserted blindly:**
+
+| Sub-condition | Verdict | Sub-text |
+|---|---|---|
+| drops ≥ 8° after the peak | `Warm, cools late` | `65–86° · layer for pm` |
+| still near peak & warmer at window end | `Still warming` | `80–88° · peak 88° later` |
+| feels-like > temp+2° (humid) | `Warm & muggy` | `81–84° · humid` |
+| otherwise (steady) | `Warm` | `81–84° · steady` |
+
+This fixes a draft bug where `Warm, cools late` was emitted for *any* hi ≥ 80° regardless of
+whether it actually cooled. **Principle: a card never claims a trend it hasn't verified** — the
+same guard already applied to TREND. (Other slot-1 bands are pure state and need no trend check.)
 | else | `Cool` / `Cool & damp` | `47–54° · layers` |
 
 **Slots 2–3 — situational cards (first-draft triggers & scores; higher wins):**
