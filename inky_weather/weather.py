@@ -250,6 +250,11 @@ def fetch_ensemble(lat, long, first_hour, count=12, timeout=20):
     return parse_ensemble(resp.json(), first_hour, count)
 
 
+def load_ensemble_fixture(fixture_dir, first_hour, count=12):
+    with open(os.path.join(fixture_dir, "openmeteo_ensemble.json")) as f:
+        return parse_ensemble(json.load(f), first_hour, count)
+
+
 _AIRQUALITY_ENDPOINT = "https://air-quality-api.open-meteo.com/v1/air-quality"
 _FORECAST_ENDPOINT = "https://api.open-meteo.com/v1/forecast"
 
@@ -278,6 +283,11 @@ def fetch_air_quality(lat, long, first_hour, count=12, timeout=20):
     resp = requests.get(air_quality_url(lat, long), timeout=timeout)
     resp.raise_for_status()
     return parse_air_quality(resp.json(), first_hour, count)
+
+
+def load_airquality_fixture(fixture_dir, first_hour, count=12):
+    with open(os.path.join(fixture_dir, "openmeteo_airquality.json")) as f:
+        return parse_air_quality(json.load(f), first_hour, count)
 
 
 def _sun_label(iso):
