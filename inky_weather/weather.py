@@ -192,3 +192,59 @@ def parse_hourly(data, count=12):
             "uv": obj.get("uvIndex", 0),
         })
     return hours
+
+
+_ENSEMBLE_ENDPOINT = "https://ensemble-api.open-meteo.com/v1/ensemble"
+
+
+def percentile(sorted_vals, p):
+    """Linear-interpolated percentile (p in 0..100) of a pre-sorted list."""
+    if not sorted_vals:
+        return 0.0
+    k = (len(sorted_vals) - 1) * (p / 100.0)
+    lo = int(k)
+    hi = min(lo + 1, len(sorted_vals) - 1)
+    return sorted_vals[lo] + (sorted_vals[hi] - sorted_vals[lo]) * (k - lo)
+
+
+def _align_index(times, first_hour):
+    """Index of the first entry whose local hour == first_hour (else 0)."""
+    for i, t in enumerate(times):
+        if int(t[11:13]) == first_hour:
+            return i
+    return 0
+
+
+def parse_ensemble(data, first_hour, count=12):
+    """Return (bands, gust): per-hour temp (p10,p25,p75,p90) and mean gust mph."""
+    hourly = data.get("hourly", {})
+    times = hourly.get("time", [])
+    if not times:
+        return [], []
+    start = _align_index(times, first_hour)
+    temp_keys = [k for k in hourly if k.startswith("temperature_2m")]
+    gust_keys = [k for k in hourly if k.startswith("wind_gusts_10m")]
+    bands, gust = [], []
+    for i in range(start, min(start + count, len(times))):
+        temps = sorted(hourly[k][i] for k in temp_keys
+                       if i < len(hourly[k]) and hourly[k][i] is not None)
+        bands.append((round(percentile(temps, 10)), round(percentile(temps, 25)),
+                      round(percentile(temps, 75)), round(percentile(temps, 90))))
+        gs = [hourly[k][i] for k in gust_keys
+              if i < len(hourly[k]) and hourly[k][i] is not None]
+        gust.append(round(sum(gs) / len(gs)) if gs else 0)
+    return bands, gust
+
+
+def ensemble_url(lat, long, count=12):
+    params = {"latitude": lat, "longitude": long, "models": "gfs_seamless",
+              "hourly": "temperature_2m,wind_gusts_10m",
+              "temperature_unit": "fahrenheit", "wind_speed_unit": "mph",
+              "timezone": "auto", "forecast_days": 2}
+    return "{}?{}".format(_ENSEMBLE_ENDPOINT, urlencode(params))
+
+
+def fetch_ensemble(lat, long, first_hour, count=12, timeout=20):
+    resp = requests.get(ensemble_url(lat, long, count), timeout=timeout)
+    resp.raise_for_status()
+    return parse_ensemble(resp.json(), first_hour, count)

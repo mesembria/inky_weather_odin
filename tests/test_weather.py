@@ -208,3 +208,23 @@ def test_fetch_live_raises_weather_api_error_with_message():
         with pytest.raises(weather.WeatherAPIError) as exc:
             weather.fetch_live("40.0", "--105.1", "KEY")
     assert "location.longitude" in str(exc.value)
+
+
+def test_percentile_interpolates():
+    assert weather.percentile([10, 20, 30, 40], 50) == 25
+
+
+def test_parse_ensemble_aligns_and_summarizes():
+    data = {"hourly": {
+        "time": ["2026-07-03T12:00", "2026-07-03T13:00", "2026-07-03T14:00"],
+        "temperature_2m": [70, 72, 74],
+        "temperature_2m_member01": [68, 70, 72],
+        "temperature_2m_member02": [74, 76, 78],
+        "wind_gusts_10m": [10, 12, 14],
+        "wind_gusts_10m_member01": [12, 14, 16],
+    }}
+    bands, gust = weather.parse_ensemble(data, first_hour=13, count=2)
+    assert len(bands) == 2
+    p10, p25, p75, p90 = bands[0]      # aligned to the 13:00 row
+    assert p10 <= p25 <= p75 <= p90
+    assert gust[0] == 13               # mean of [12, 14]
