@@ -39,7 +39,7 @@ cards** (the verdict) with a **rich ensemble graph** (the evidence).
 | Source | Role |
 |---|---|
 | **Google Maps Platform Weather API** (existing) | Deterministic hourly forecast: temp, feels-like, precip probability & type, thunderstorm probability, UV, condition + **official condition icons** (`iconBaseUri`). Drives the "expected" line, the advice logic, and the per-hour icons. |
-| **Open-Meteo Ensemble API** (new) | GEFS ensemble members (hourly, free for non-commercial use, no API key). Drives the **temperature spread band** and the **precip spread**, plus the **confidence badge**. Endpoint: `https://api.open-meteo.com/v1/ensemble` with `models=gfs_seamless`, `hourly=temperature_2m,precipitation_probability` (or `precipitation`). Also supplies **`wind_gusts_10m`** for the WIND card (deterministic Open-Meteo forecast, same request family). |
+| **Open-Meteo Ensemble API** (new) | GEFS ensemble members (hourly, free for non-commercial use, no API key). Drives the **temperature spread band** and the **precip spread**, plus the **confidence badge**. Endpoint: `https://api.open-meteo.com/v1/ensemble` with `models=gfs_seamless`, `hourly=temperature_2m,precipitation_probability` (or `precipitation`). Also supplies **`wind_gusts_10m`** for the WIND card and **`daily=sunrise,sunset`** for the DAYLIGHT card (same Open-Meteo request family). |
 | **Open-Meteo Air-Quality API** (new) | US AQI for the SMOKE/AQI card (wildfire season). Endpoint: `https://air-quality-api.open-meteo.com/v1/air-quality` with `hourly=us_aqi`. **Confirmed worth the extra call.** |
 
 Google's public API is powered by an ensemble model (WeatherNext 2) but only exposes
@@ -107,6 +107,7 @@ no "umbrella" advice for rain that falls while you're asleep, no "get outside" a
 
 | Card | Trigger (daytime hours) | Score | Verdict / detail |
 |---|---|---|---|
+| ICE | precip = freezing rain / sleet (`precip_kind == "mix"`), pop ≥ 30 | 97 | `Ice 9a–12p` · `Icy roads · avoid driving` |
 | SNOW | precip = snow, pop ≥ 30 | 95 | `Snow all day` · `6" likely · roads slick` |
 | STORMS | thunder ≥ 45 / 25 | 90 / 68 | `T-storms 2p` · `65% · brief, heavy` |
 | SMOKE | US AQI ≥ 150 / 100 | 88 / 64 | `Unhealthy air` · `AQI 168 · stay indoors` |
@@ -121,6 +122,7 @@ already has a daytime card, so a day-long snow doesn't also print "Snow overnigh
 
 | Sub-condition | Score | Verdict / detail |
 |---|---|---|
+| overnight ice | 88 | `Ice overnight` · `Low 30° · icy roads AM` |
 | overnight thunder ≥ 30 | 85 | `Storms overnight` · `Low 66° · windows shut` |
 | overnight snow | 82 | `Snow overnight` · `Low 30° · roads slick AM` |
 | overnight rain ≥ 50 | 60 | `Rain overnight` · `Low 58° · windows shut` |
@@ -129,21 +131,33 @@ already has a daytime card, so a day-long snow doesn't also print "Snow overnigh
 | low 46–68 | 50 | `Windows open` · `Low 62° · comfortable` |
 | low 69 | 50 | `Mild night` · `Low 69°` |
 
-*Fallback (nothing situational fired) — framed by whether the window is mostly day or night:*
+*Info tier (low priority; fills spare slots **below every hazard**, so the display almost always
+shows three real cards without manufacturing filler):*
 
-| When | Score | Verdict / detail |
-|---|---|---|
-| mostly daytime | 30 | `Get outside` · `Clear & calm ahead` |
-| mostly nighttime | 30 | `Quiet night` · `Clear & calm` |
+| Card | Trigger | Score | Verdict / detail |
+|---|---|---|---|
+| SWING | ensemble genuinely diverges (widest hour p10–p90 > ~15°) | 40 | `Could be 78–88°` · `models split by 4p` |
+| MOON | full / near-full (illumination ≥ 90%) **and** a night is in the window | 36 | `Full moon` · `100% lit · bright night` |
+| calm nudge | nothing hazardous is active (nothing scored ≥ 50) | 34 | `Get outside` (day) / `Quiet night` (night) · `Clear & calm` |
+| DAYLIGHT | always available | 32 | `Sunset 8:31p` (day) / `Sunrise 6:12a` (night) · `plan outdoor time` |
+
+MOON is computed from the date (a moon-phase calc), no API. DAYLIGHT uses Open-Meteo's daily
+sunrise/sunset (so it fills even when the sun event is just past the 12-hour window). **If, after
+the info tier, still fewer than two situational cards apply, the banner gracefully shows two
+cards (wider) — no forced third.**
 
 Notes from the workshop pass: TREND fires only on a genuinely big swing (≥ 18°, either
 direction) and reports it factually (`Cooling off 105°→90°`), so it stays rare and never
 editorializes a still-hot afternoon as "colder"; the old time-"window" metaphor (`Wet window`,
 `Great window`, `Open tonight`) was dropped as confusing. **Confidence** is a header badge, not
-a card (from mean band width). SWING (`Could be 78–88° · models disagree pm`) is approved but its
-scoring — when a wide ensemble earns a slot vs. just widening the band — is still open (§10).
-When fewer than two situational cards fire, only two cards show; whether to always fill the
-third slot (e.g. a sunrise/daylight info card) is an open layout question.
+a card (from mean band width) — distinct from the **SWING** info card, which puts a number on the
+disagreement only when it's genuinely wide.
+
+**Ties are broken by a fixed card-type precedence, high→low:** `ICE, SNOW, STORMS, SMOKE, WIND,
+RAIN, UV, TREND`, then overnight precip, then overnight comfort, then the info tier
+(`SWING, MOON, calm nudge, DAYLIGHT`). Within the same type, **daytime precedes overnight.** This
+makes the two chosen cards deterministic for any input (e.g. the `UV` / `overnight rain` tie at 60
+resolves to `overnight rain`, since precip outranks UV).
 
 These bands/scores/wording live in `config.py` so they can be tuned after living with the
 display — this is the "make or break" layer and is expected to keep evolving. If a data field
@@ -226,10 +240,15 @@ logic; multi-day may return later as a TREND card but not as a strip.
 2. Precip bar style (floating vs grounded) — chosen on the real panel.
 3. ~~Bundled display font~~ — **resolved: Oswald (OFL).**
 4. Exact Open-Meteo request shape and whether to store raw members or precomputed percentiles.
-5. SWING card scoring (when a wide ensemble earns a slot vs. just widening the band).
+5. ~~SWING card scoring~~ — **resolved: low-priority info card (score 40), fires only on genuine
+   divergence.** The **2-card gap** is also **resolved** via the info tier + graceful 2-card
+   fallback (§5).
+
+Sun times for the DAYLIGHT card come from the Open-Meteo daily endpoint
+(`daily=sunrise,sunset`); MOON needs no API (moon-phase calc from the date).
 
 ## 11. Reference Mockups
 
 Committed under `docs/design/` (real 800×480 renders in the 7-color palette, Oswald face):
-`redesign-mock-storm.png`, `redesign-mock-hot.png`, and the workshop set
-`loc-phoenix/denver/seattle/sacramento/chicago.png`.
+`redesign-mock-storm.png`, `redesign-mock-hot.png`, the workshop set
+`loc-phoenix/denver/seattle/sacramento/chicago.png`, and `demo-moon.png` (info-tier example).
