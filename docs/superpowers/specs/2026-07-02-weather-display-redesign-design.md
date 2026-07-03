@@ -77,29 +77,22 @@ This kept the display relevant across every test: Phoenix → heat / UV / warm-n
 bundle-up / snow / wind; Seattle → cool-damp / wet-window / overnight; Sacramento → hot /
 smoke / warm-night; Chicago → cool / gusty / turning-colder; plus the two original storm days.
 
-**Slot 1 — temperature card (first-draft bands):**
+**Slot 1 — temperature card.** A plain **state line keyed on the day's high** (like every other
+band — no trend detection here; trends live in the TREND card). Detail is `{lo}–{hi}° · <cue>`,
+with `· frost AM` appended when the low ≤ 32°, and `Warm`→`Warm & muggy` / `Cool`→`Cool & damp`
+when humid / wet.
 
-| Condition | Verdict | Detail |
+| Condition (high) | Verdict | Detail |
 |---|---|---|
-| low ≤ 32° | `Bundle up` | `20–30° · frost` |
-| hi ≥ 100° | `Dangerous heat` | `90–112° · hydrate, shade` |
-| hi ≥ 90° | `Hot` | `80–98° · UV n, shade` |
-| hi ≥ 80° | **verified trend, see below** | — |
-| hi ≥ 62° | `Mild` | `52–61° · easy layers` |
-| else | `Cool` / `Cool & damp` | `47–54° · layers` |
+| ≥ 100° | `Dangerous heat` | `90–112° · hydrate, shade` |
+| ≥ 90° | `Hot` | `80–98° · UV n, shade` |
+| ≥ 80° | `Warm` / `Warm & muggy` | `63–81° · pleasant` / `· humid` |
+| ≥ 62° | `Mild` | `52–61° · easy layers` |
+| ≥ 48° | `Cool` / `Cool & damp` | `47–54° · layers` |
+| ≥ 33° | `Cold` | `35–46° · coat` (+ `· frost AM`) |
+| < 33° (freezing all day) | `Frigid` | `20–30° · bundle up` |
 
-**Warm band (hi ≥ 80°) — verdict is chosen from the actual trajectory, never asserted blindly:**
-
-| Sub-condition | Verdict | Sub-text |
-|---|---|---|
-| drops ≥ 8° after the peak | `Warm, cools late` | `65–86° · layer for pm` |
-| still near peak & warmer at window end | `Still warming` | `80–88° · peak 88° later` |
-| feels-like > temp+2° (humid) | `Warm & muggy` | `81–84° · humid` |
-| otherwise (steady) | `Warm` | `81–84° · steady` |
-
-This fixes a draft bug where `Warm, cools late` was emitted for *any* hi ≥ 80° regardless of
-whether it actually cooled. **Principle: a card never claims a trend it hasn't verified** — the
-same guard already applied to TREND. (Other slot-1 bands are pure state and need no trend check.)
+The 33–47° range — previously mislabeled `Cool` — now gets its own **`Cold`** band.
 
 **Slots 2–3 — situational cards (first-draft triggers & scores; higher wins).**
 
@@ -118,7 +111,7 @@ no "umbrella" advice for rain that falls while you're asleep, no "get outside" a
 | WIND | gusts ≥ 35 / 25 | 80 / 56 | `Gusty` · `Gusts 45 mph · secure loose items` |
 | RAIN | pop ≥ 50 (non-snow) | 72 | `Rain 8a–12p` · `70% · umbrella` (timing is the verdict) |
 | UV | UV ≥ 9 / 6 | 60 / 44 | `Extreme UV` · `Index 11 · cover up` |
-| TREND | cools ≥ 12° **and** late low ≤ 65° | 58 | `Turning colder` · `58°→39° by evening` |
+| TREND | a big swing **either direction**, ≥ 18° over the window | 58 | `Cooling off` · `58°→39° by 1a`  /  `Warming up` · `44°→78° by 5p` |
 
 *OVERNIGHT (one card; fires when night hours are in the window; verdict = the most salient
 overnight thing, precip before comfort). A precip branch is suppressed if the same precip
@@ -141,8 +134,9 @@ already has a daytime card, so a day-long snow doesn't also print "Snow overnigh
 | mostly daytime | 30 | `Get outside` · `Clear & calm ahead` |
 | mostly nighttime | 30 | `Quiet night` · `Clear & calm` |
 
-Notes from the workshop pass: TREND is gated on the late low actually being cool (else a
-112°→90° afternoon wrongly reads "colder"); the old time-"window" metaphor (`Wet window`,
+Notes from the workshop pass: TREND fires only on a genuinely big swing (≥ 18°, either
+direction) and reports it factually (`Cooling off 105°→90°`), so it stays rare and never
+editorializes a still-hot afternoon as "colder"; the old time-"window" metaphor (`Wet window`,
 `Great window`, `Open tonight`) was dropped as confusing. **Confidence** is a header badge, not
 a card (from mean band width). SWING (`Could be 78–88° · models disagree pm`) is approved but its
 scoring — when a wide ensemble earns a slot vs. just widening the band — is still open (§10).
