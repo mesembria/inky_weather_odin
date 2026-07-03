@@ -53,3 +53,25 @@ def test_rain_card_is_daytime_timing():
     hrs = _hours([60]*12, pop=70)
     rain = [c for _, c in advice._situational(hrs, 5, 20) if c["cat"] == "OUTDOORS"]
     assert rain and rain[0]["verdict"].startswith("Rain ")
+
+
+def test_build_cards_calm_day_fills_info_tier():
+    hrs = _hours([60, 63, 66, 68, 70, 71, 71, 70, 68, 66, 64, 62])
+    cards = advice.build_cards(hrs, [], [], [], {"sunset": "8p"}, datetime.date(2026, 7, 15))
+    assert cards[0]["cat"] == "DRESS"
+    cats = [c["cat"] for c in cards]
+    assert "DAYLIGHT" in cats or "OUTDOORS" in cats   # info tier filled a slot
+
+
+def test_build_cards_full_moon_night():
+    hrs = _hours([60, 58, 56, 55, 54, 53, 52, 52, 53, 54, 55, 56], day=False)
+    cards = advice.build_cards(hrs, [], [], [], {}, datetime.date(2026, 7, 28))
+    assert any(c["cat"] == "MOON" for c in cards)
+
+
+def test_build_cards_hazards_beat_info_tier():
+    hrs = _hours([78]*12, thunder=65, pop=90)
+    cards = advice.build_cards(hrs, [], [], [], {"sunset": "8p"}, datetime.date(2026, 7, 15))
+    assert cards[0]["cat"] == "DRESS"
+    assert any(c["cat"] == "STORMS" for c in cards)
+    assert not any(c["cat"] in ("MOON", "DAYLIGHT") for c in cards)  # crowded out

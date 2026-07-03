@@ -67,6 +67,24 @@ def _w1(hs):
     return hs[-1]["ampm_label"].lower()
 
 
+# tie-break precedence for equal scores: lower index = wins
+_PRECEDENCE = ["ICE", "SNOW", "STORMS", "SMOKE", "WIND", "OUTDOORS", "SUN",
+               "TREND", "OVERNIGHT", "SPREAD", "MOON", "DAYLIGHT"]
+
+
+def _tiebreak_key(scored):
+    score, card = scored
+    try:
+        rank = _PRECEDENCE.index(card["cat"])
+    except ValueError:
+        rank = len(_PRECEDENCE)
+    return (-score, rank)
+
+
+def _band_width(bands):
+    return max((p90 - p10 for p10, _, _, p90 in bands), default=0)
+
+
 def _situational(hours, gust, aqi):
     """Daytime-framed hazard cards + one OVERNIGHT roll-up. Returns [(score, card)]."""
     C = []
@@ -146,3 +164,47 @@ def _situational(hours, gust, aqi):
             card, sc = _card("OVERNIGHT", "Mild night", "Low {}°".format(nlo), "green"), 50
         C.append((sc, card))
     return C
+
+
+def _info_tier(hours, bands, sun, date, has_hazard):
+    C = []
+    day_h = [h for h in hours if h["is_daytime"]]
+    night_h = [h for h in hours if not h["is_daytime"]]
+    daymost = len(day_h) >= len(night_h)
+    # SWING
+    if bands:
+        widths = [(p90 - p10, i) for i, (p10, _, _, p90) in enumerate(bands)]
+        wmax, wi = max(widths)
+        if wmax >= 15:
+            p10, _, _, p90 = bands[wi]
+            C.append((40, _card("SPREAD", "Could be {}-{}°".format(int(p10), int(p90)),
+                                "models split by {}".format(hours[wi]["ampm_label"].lower()), "purple")))
+    # MOON
+    if night_h:
+        il = moon_illumination(date)
+        if il >= 0.90:
+            C.append((36, _card("MOON", "Full moon" if il >= 0.985 else "Nearly full moon",
+                                "{}% lit · bright night".format(int(round(il * 100))), "orange")))
+    # calm nudge
+    if not has_hazard:
+        C.append((34, _card("OUTDOORS", "Get outside", "Clear & calm ahead", "green") if daymost
+                  else _card("OVERNIGHT", "Quiet night", "Clear & calm", "green")))
+    # DAYLIGHT
+    if daymost and sun.get("sunset"):
+        C.append((32, _card("DAYLIGHT", "Sunset {}".format(sun["sunset"]), "plan outdoor time", "orange")))
+    elif not daymost and sun.get("sunrise"):
+        C.append((32, _card("DAYLIGHT", "Sunrise {}".format(sun["sunrise"]), "first light", "orange")))
+    return C
+
+
+def build_cards(hours, bands, gust, aqi, sun, date):
+    sun = sun or {}
+    gmax = max(gust) if gust else 0
+    amax = max(aqi) if aqi else 0
+    cards = [temp_card(hours)]
+    scored = _situational(hours, gmax, amax)
+    has_hazard = any(s >= 50 for s, _ in scored)
+    scored += _info_tier(hours, bands, sun, date, has_hazard)
+    scored.sort(key=_tiebreak_key)
+    cards += [c for _, c in scored[:2]]
+    return cards
