@@ -4,7 +4,7 @@ import datetime
 import os
 import sys
 
-from . import weather, icons, render
+from . import weather, icons, render, advice
 
 FIXTURE_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 ICON_CACHE = os.path.join(os.path.dirname(__file__), "assets", "icons")
@@ -20,10 +20,12 @@ def _load_config():
         raise
 
 
-def _gather(use_fixture, cfg):
-    if use_fixture:
-        return weather.load_from_fixtures(FIXTURE_DIR)
-    return weather.fetch_live(cfg["lat"], cfg["long"], cfg["google_weather_key"])
+def _safe(fn, default=None):
+    """Run fn, returning default on any exception (graceful degradation)."""
+    try:
+        return fn()
+    except Exception:
+        return default
 
 
 def _icons_for(items, size):
@@ -31,15 +33,29 @@ def _icons_for(items, size):
 
 
 def build_image(use_fixture, cfg):
-    hours, days = _gather(use_fixture, cfg)
+    if use_fixture:
+        hours, _days = weather.load_from_fixtures(FIXTURE_DIR)
+        bands, gust = weather.load_ensemble_fixture(FIXTURE_DIR, hours[0]["hour"])
+        aqi = weather.load_airquality_fixture(FIXTURE_DIR, hours[0]["hour"])
+        sun = {"sunset": "8p", "sunrise": "6a"}
+    else:
+        hours, _days = weather.fetch_live(cfg["lat"], cfg["long"], cfg["google_weather_key"])
+        fh = hours[0]["hour"]
+        bands_gust = _safe(lambda: weather.fetch_ensemble(cfg["lat"], cfg["long"], fh),
+                           default=([], []))
+        bands, gust = bands_gust
+        aqi = _safe(lambda: weather.fetch_air_quality(cfg["lat"], cfg["long"], fh), default=[])
+        sun = _safe(lambda: weather.fetch_sun(cfg["lat"], cfg["long"]), default={})
+
     hour_icons = _icons_for(hours, render.ICON_SZ_HOUR)
-    day_icons = _icons_for(days, render.ICON_SZ_DAY)
     now = datetime.datetime.now()
+    cards = advice.build_cards(hours, bands, gust, aqi, sun, now.date())
+    badge = advice.confidence(bands)
     return render.render_display(
-        hours, days, hour_icons, day_icons,
+        hours, bands, hour_icons, cards, badge,
         location_name=cfg.get("location_name", ""),
         date_str=now.strftime("%a %b %-d"),
-        updated_str=now.strftime("%-I:%M %p"),
+        updated_str=now.strftime("%-I:%M%p").lower().lstrip("0"),
     )
 
 
