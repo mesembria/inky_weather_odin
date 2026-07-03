@@ -1,4 +1,5 @@
 """Pillow rendering for the Inky Impression weather display."""
+import os
 from PIL import Image, ImageDraw, ImageFont
 from . import weather
 
@@ -24,6 +25,27 @@ COLOR_DRY = (210, 210, 210)
 
 ICON_SZ_HOUR = 34
 ICON_SZ_DAY = 32
+
+# --- new redesign palette + font (additive) ---
+INK = (20, 22, 28)
+PURPLE = (150, 40, 140)
+GRAY = (120, 122, 130)
+FAINT = (225, 226, 230)
+
+ACCENTS = {"red": RED, "orange": ORANGE, "blue": BLUE, "green": GREEN,
+           "purple": PURPLE, "ink": INK, "gray": GRAY}
+
+_FONT_PATH = os.path.join(os.path.dirname(__file__), "assets", "fonts", "Oswald.ttf")
+
+
+def display_font(size, weight=600):
+    """Bundled Oswald at the given size and weight (300 or 600)."""
+    f = ImageFont.truetype(_FONT_PATH, int(size))
+    try:
+        f.set_variation_by_axes([weight])
+    except Exception:
+        pass
+    return f
 
 
 def kind_color(kind):

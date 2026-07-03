@@ -126,3 +126,9 @@ def test_draw_bolt_marks_pixels():
     d = ImageDraw.Draw(img)
     render.draw_bolt(d, 5, 5, 16, (230, 120, 0))
     assert img.tobytes() != Image.new("RGB", (30, 30), (255, 255, 255)).tobytes()
+
+
+def test_display_font_loads_and_varies_weight():
+    f = render.display_font(30, 600)
+    assert hasattr(f, "getbbox")
+    assert render.ACCENTS["red"] == render.RED
