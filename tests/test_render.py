@@ -141,3 +141,16 @@ def test_draw_banner_marks_pixels():
              {"cat": "STORMS", "verdict": "T-storms 2p", "detail": "65%", "accent": "red"}]
     render.draw_banner(d, cards)
     assert img.tobytes() != Image.new("RGB", (render.WIDTH, render.HEIGHT), render.WHITE).tobytes()
+
+
+def test_draw_graph_runs_with_and_without_band():
+    hours = [{"hour": (10 + i), "ampm_label": "{}p".format(i or 12), "is_daytime": True,
+              "condition": "CLEAR", "icon_uri": "", "temp_f": 70 + i, "feels_f": 70 + i,
+              "pop": 20 * (i % 3), "precip_type": "RAIN", "thunder": 0, "uv": 3}
+             for i in range(12)]
+    bands = [(t - 3, t - 1, t + 1, t + 3) for t in (h["temp_f"] for h in hours)]
+    for b in (bands, []):
+        img = Image.new("RGB", (render.WIDTH, render.HEIGHT), render.WHITE)
+        d = ImageDraw.Draw(img)
+        render.draw_graph(img, d, hours, b, [None] * 12, 14, 160, render.WIDTH - 28, 300)
+        assert img.tobytes() != Image.new("RGB", (render.WIDTH, render.HEIGHT), render.WHITE).tobytes()

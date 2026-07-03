@@ -60,11 +60,12 @@ def kind_color(kind):
 
 
 def temp_color(temp_f):
-    """Warm temps -> red, cool -> blue. Simple two-stop ramp."""
-    if temp_f >= 78:
+    if temp_f >= 80:
         return RED
-    if temp_f >= 60:
-        return BLACK
+    if temp_f >= 72:
+        return ORANGE
+    if temp_f >= 55:
+        return INK
     return BLUE
 
 
@@ -137,6 +138,14 @@ LAYOUT = {
 }
 LAYOUT["strip_x"] = LAYOUT["hourly_w"] + 2
 LAYOUT["strip_w"] = LAYOUT["daily_w"] - 2
+
+# Graph layout constants for ensemble display
+GRAPH_Y = BANNER_Y + BANNER_H + 2
+GRAPH_H = HEIGHT - GRAPH_Y - 8
+BAND_OUT = (213, 220, 240)
+BAND_IN = (178, 190, 224)
+
+_KIND_BAR = {"storm": RED, "snow": PURPLE, "mix": PURPLE, "rain": BLUE, "dry": BLUE}
 
 
 def draw_header(draw, location, date_str, updated_str, badge):
@@ -321,6 +330,74 @@ def draw_daily_strip(img, draw, days, icons):
         if i > 0:
             draw.line([strip_x, y, strip_x + strip_w, y], fill=(205, 200, 186))
         draw_daily_row(img, draw, day, y, row_h, icons[i], global_lo, global_hi)
+
+
+def draw_graph(img, draw, hours, bands, icons, gx, gy, gw, gh):
+    n = len(hours)
+    temps = [h["temp_f"] for h in hours]
+    has_band = len(bands) == n and n > 0
+    lows = [b[0] for b in bands] if has_band else temps
+    highs = [b[3] for b in bands] if has_band else temps
+    mn, mx = min(lows), max(highs)
+    rng = (mx - mn) or 1
+    bandh = 82
+    axis_y = gy + gh - 16
+    top = gy + 40
+    plot_h = (axis_y - bandh) - top
+    lx = gx + 30
+    xs = [lx + (gw - 32) * (i + 0.5) / n for i in range(n)]
+
+    def Y(t):
+        return top + plot_h * (1 - (t - mn) / rng)
+
+    # temp gridlines + labels
+    lo10 = int((mn // 10) * 10)
+    hi10 = int((mx // 10 + 1) * 10)
+    step = 10 if (hi10 - lo10) >= 20 else 5
+    for g in range(lo10, hi10 + 1, step):
+        if g < mn - 2 or g > mx + 2:
+            continue
+        gyv = Y(g)
+        draw.line([lx, gyv, gx + gw, gyv], fill=(230, 231, 236), width=1)
+        _ctext(draw, "{}°".format(g), gx + 2, gyv, display_font(11, 600), (165, 168, 178), anchor="lm")
+
+    # nested ensemble band
+    if has_band:
+        def poly(los, his):
+            return list(zip(xs, [Y(v) for v in his])) + list(zip(reversed(xs), [Y(v) for v in reversed(los)]))
+        draw.polygon(poly([b[0] for b in bands], [b[3] for b in bands]), fill=BAND_OUT)
+        draw.polygon(poly([b[1] for b in bands], [b[2] for b in bands]), fill=BAND_IN)
+
+    # precip strip (grounded pop% bars, colored by kind)
+    pbase = axis_y
+    sc = bandh - 14
+    for i, h in enumerate(hours):
+        pop = h["pop"]
+        if pop < 5:
+            continue
+        bx = xs[i]
+        bw = (gw - 32) / n * 0.30
+        bh = (pop / 100.0) * sc
+        kind = weather.precip_kind(pop, h["precip_type"], h["thunder"])
+        col = _KIND_BAR.get(kind, BLUE)
+        draw.rectangle([bx - bw, pbase - bh, bx + bw, pbase], fill=col)
+        _ctext(draw, "{}%".format(pop), bx, pbase - bh - 8, display_font(12, 600), col)
+    _ctext(draw, "RAIN %", gx + 2, pbase - bandh + 2, display_font(9, 600), GRAY, anchor="lm")
+
+    # temp line + points + labels + icons
+    ys = [Y(t) for t in temps]
+    draw.line(list(zip(xs, ys)), fill=INK, width=3, joint="curve")
+    for i, h in enumerate(hours):
+        x, y = xs[i], ys[i]
+        draw.ellipse([x - 3, y - 3, x + 3, y + 3], fill=INK)
+        _ctext(draw, "{}°".format(h["temp_f"]), x, y - 14, display_font(19, 600), temp_color(h["temp_f"]))
+        if icons[i] is not None:
+            img.paste(icons[i], (int(x - 14), int(top - 32)), icons[i])
+
+    # x axis
+    draw.line([lx, axis_y, gx + gw, axis_y], fill=(200, 200, 205), width=1)
+    for i, h in enumerate(hours):
+        _ctext(draw, h["ampm_label"], xs[i], axis_y + 8, display_font(12, 300), GRAY)
 
 
 def render_error(message):
