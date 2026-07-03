@@ -86,6 +86,7 @@ smoke / warm-night; Chicago → cool / gusty / turning-colder; plus the two orig
 | hi ≥ 90° | `Hot` | `80–98° · UV n, shade` |
 | hi ≥ 80° | **verified trend, see below** | — |
 | hi ≥ 62° | `Mild` | `52–61° · easy layers` |
+| else | `Cool` / `Cool & damp` | `47–54° · layers` |
 
 **Warm band (hi ≥ 80°) — verdict is chosen from the actual trajectory, never asserted blindly:**
 
@@ -99,27 +100,54 @@ smoke / warm-night; Chicago → cool / gusty / turning-colder; plus the two orig
 This fixes a draft bug where `Warm, cools late` was emitted for *any* hi ≥ 80° regardless of
 whether it actually cooled. **Principle: a card never claims a trend it hasn't verified** — the
 same guard already applied to TREND. (Other slot-1 bands are pure state and need no trend check.)
-| else | `Cool` / `Cool & damp` | `47–54° · layers` |
 
-**Slots 2–3 — situational cards (first-draft triggers & scores; higher wins):**
+**Slots 2–3 — situational cards (first-draft triggers & scores; higher wins).**
 
-| Card | Trigger | Score | Verdict / detail |
+**Framing is day/night aware** — a card only phrases for what you'd actually *do* about it. So
+**daytime precip is its own outdoor-framed card**, and **anything that happens overnight (rain,
+storms, snow, or just comfort) rolls up into a single sleep/windows-framed OVERNIGHT card** —
+no "umbrella" advice for rain that falls while you're asleep, no "get outside" at 11pm.
+
+*Daytime-framed cards (relevant hours are daytime):*
+
+| Card | Trigger (daytime hours) | Score | Verdict / detail |
 |---|---|---|---|
-| SNOW | precip type = snow, pop ≥ 30 | 95 | `Snow all day` · `6" likely · roads slick` |
+| SNOW | precip = snow, pop ≥ 30 | 95 | `Snow all day` · `6" likely · roads slick` |
 | STORMS | thunder ≥ 45 / 25 | 90 / 68 | `T-storms 2p` · `65% · brief, heavy` |
 | SMOKE | US AQI ≥ 150 / 100 | 88 / 64 | `Unhealthy air` · `AQI 168 · stay indoors` |
 | WIND | gusts ≥ 35 / 25 | 80 / 56 | `Gusty` · `Gusts 45 mph · secure loose items` |
-| OUTDOORS/RAIN | pop ≥ 50 (non-snow) | 72 | `Wet window` · `Rain 8a–12p` |
-| UV / SUN | UV ≥ 9 / 6 | 60 / 44 | `Extreme UV` · `Index 11 · cover up` |
+| RAIN | pop ≥ 50 (non-snow) | 72 | `Rain 8a–12p` · `70% · umbrella` (timing is the verdict) |
+| UV | UV ≥ 9 / 6 | 60 / 44 | `Extreme UV` · `Index 11 · cover up` |
 | TREND | cools ≥ 12° **and** late low ≤ 65° | 58 | `Turning colder` · `58°→39° by evening` |
-| OVERNIGHT | night hours ahead | 50 | `Open tonight` / `Warm night` / `Cold night` / `Storms overnight` (by low & storm risk) |
-| (fallback) | nothing else triggers | 30 | `Great window` · `Clear & calm ahead` |
-| SWING | ensemble p10–p90 wide | tbd | `Could be 78–88°` · `models disagree pm` |
 
-Notes from the workshop pass: TREND must be gated on the late low actually being cool (else a
-112°→90° afternoon wrongly reads as "colder"); OVERNIGHT branches by low (`≤45` cold/heat-on,
-`≤68` open, `≥70` warm/stuffy) and by overnight storm risk. **Confidence** is a header badge,
-not a card (from mean band width). SWING scoring is still open.
+*OVERNIGHT (one card; fires when night hours are in the window; verdict = the most salient
+overnight thing, precip before comfort). A precip branch is suppressed if the same precip
+already has a daytime card, so a day-long snow doesn't also print "Snow overnight":*
+
+| Sub-condition | Score | Verdict / detail |
+|---|---|---|
+| overnight thunder ≥ 30 | 85 | `Storms overnight` · `Low 66° · windows shut` |
+| overnight snow | 82 | `Snow overnight` · `Low 30° · roads slick AM` |
+| overnight rain ≥ 50 | 60 | `Rain overnight` · `Low 58° · windows shut` |
+| low ≤ 45 | 55 | `Cold night` · `Low 28° · heat on` |
+| low ≥ 70 | 50 | `Warm night` · `Low 74° · stuffy, fan on` |
+| low 46–68 | 50 | `Windows open` · `Low 62° · comfortable` |
+| low 69 | 50 | `Mild night` · `Low 69°` |
+
+*Fallback (nothing situational fired) — framed by whether the window is mostly day or night:*
+
+| When | Score | Verdict / detail |
+|---|---|---|
+| mostly daytime | 30 | `Get outside` · `Clear & calm ahead` |
+| mostly nighttime | 30 | `Quiet night` · `Clear & calm` |
+
+Notes from the workshop pass: TREND is gated on the late low actually being cool (else a
+112°→90° afternoon wrongly reads "colder"); the old time-"window" metaphor (`Wet window`,
+`Great window`, `Open tonight`) was dropped as confusing. **Confidence** is a header badge, not
+a card (from mean band width). SWING (`Could be 78–88° · models disagree pm`) is approved but its
+scoring — when a wide ensemble earns a slot vs. just widening the band — is still open (§10).
+When fewer than two situational cards fire, only two cards show; whether to always fill the
+third slot (e.g. a sunrise/daylight info card) is an open layout question.
 
 These bands/scores/wording live in `config.py` so they can be tuned after living with the
 display — this is the "make or break" layer and is expected to keep evolving. If a data field
