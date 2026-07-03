@@ -228,3 +228,15 @@ def test_parse_ensemble_aligns_and_summarizes():
     p10, p25, p75, p90 = bands[0]      # aligned to the 13:00 row
     assert p10 <= p25 <= p75 <= p90
     assert gust[0] == 13               # mean of [12, 14]
+
+
+def test_parse_air_quality_aligns():
+    data = {"hourly": {"time": ["2026-07-03T12:00", "2026-07-03T13:00"],
+                        "us_aqi": [40, 55]}}
+    assert weather.parse_air_quality(data, first_hour=13, count=2) == [55]
+
+
+def test_parse_sun_labels():
+    data = {"daily": {"sunrise": ["2026-07-03T06:12"], "sunset": ["2026-07-03T20:31"]}}
+    s = weather.parse_sun(data)
+    assert s["sunrise"] == "6a" and s["sunset"] == "8p"

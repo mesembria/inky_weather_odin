@@ -248,3 +248,60 @@ def fetch_ensemble(lat, long, first_hour, count=12, timeout=20):
     resp = requests.get(ensemble_url(lat, long, count), timeout=timeout)
     resp.raise_for_status()
     return parse_ensemble(resp.json(), first_hour, count)
+
+
+_AIRQUALITY_ENDPOINT = "https://air-quality-api.open-meteo.com/v1/air-quality"
+_FORECAST_ENDPOINT = "https://api.open-meteo.com/v1/forecast"
+
+
+def parse_air_quality(data, first_hour, count=12):
+    hourly = data.get("hourly", {})
+    times = hourly.get("time", [])
+    aqi = hourly.get("us_aqi", [])
+    if not times:
+        return []
+    start = _align_index(times, first_hour)
+    out = []
+    for i in range(start, min(start + count, len(times))):
+        v = aqi[i] if i < len(aqi) and aqi[i] is not None else 0
+        out.append(int(v))
+    return out
+
+
+def air_quality_url(lat, long):
+    params = {"latitude": lat, "longitude": long, "hourly": "us_aqi",
+              "timezone": "auto", "forecast_days": 2}
+    return "{}?{}".format(_AIRQUALITY_ENDPOINT, urlencode(params))
+
+
+def fetch_air_quality(lat, long, first_hour, count=12, timeout=20):
+    resp = requests.get(air_quality_url(lat, long), timeout=timeout)
+    resp.raise_for_status()
+    return parse_air_quality(resp.json(), first_hour, count)
+
+
+def _sun_label(iso):
+    hour = int(iso[11:13])
+    suffix = "a" if hour < 12 else "p"
+    h12 = hour % 12 or 12
+    return "{}{}".format(h12, suffix)
+
+
+def parse_sun(data):
+    daily = data.get("daily", {})
+    rise = daily.get("sunrise") or []
+    setl = daily.get("sunset") or []
+    return {"sunrise": _sun_label(rise[0]) if rise else None,
+            "sunset": _sun_label(setl[0]) if setl else None}
+
+
+def sun_url(lat, long):
+    params = {"latitude": lat, "longitude": long, "daily": "sunrise,sunset",
+              "timezone": "auto", "forecast_days": 1}
+    return "{}?{}".format(_FORECAST_ENDPOINT, urlencode(params))
+
+
+def fetch_sun(lat, long, timeout=20):
+    resp = requests.get(sun_url(lat, long), timeout=timeout)
+    resp.raise_for_status()
+    return parse_sun(resp.json())
