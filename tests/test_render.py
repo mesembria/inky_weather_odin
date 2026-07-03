@@ -49,8 +49,8 @@ def _blank():
 
 def test_draw_header_marks_top_band():
     img, d = _blank()
-    render.draw_header(d, "Blacksburg, VA", "Tue Jun 30", "10:02 AM")
-    assert any(img.getpixel((x, 10)) != render.PAPER for x in range(0, render.WIDTH, 20))
+    render.draw_header(d, "Blacksburg, VA", "Tue Jun 30", "10:02 AM", ("HIGH", "green"))
+    assert any(img.getpixel((x, 20)) != render.PAPER for x in range(0, render.WIDTH, 20))
 
 
 def _sample_hours():
@@ -132,3 +132,12 @@ def test_display_font_loads_and_varies_weight():
     f = render.display_font(30, 600)
     assert hasattr(f, "getbbox")
     assert render.ACCENTS["red"] == render.RED
+
+
+def test_draw_banner_marks_pixels():
+    img = Image.new("RGB", (render.WIDTH, render.HEIGHT), render.WHITE)
+    d = ImageDraw.Draw(img)
+    cards = [{"cat": "DRESS", "verdict": "Warm", "detail": "63-81°", "accent": "orange"},
+             {"cat": "STORMS", "verdict": "T-storms 2p", "detail": "65%", "accent": "red"}]
+    render.draw_banner(d, cards)
+    assert img.tobytes() != Image.new("RGB", (render.WIDTH, render.HEIGHT), render.WHITE).tobytes()

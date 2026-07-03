@@ -93,6 +93,17 @@ def draw_centered_text(draw, text, cx, cy, font, color):
     draw.text((cx - w / 2 - bbox[0], cy - h / 2 - bbox[1]), text, font=font, fill=color)
 
 
+# Layout constants for banner cards
+BANNER_Y = 50
+BANNER_H = 104
+HEADER_RULE_Y = 40
+
+
+def _ctext(d, t, cx, cy, font, fill, anchor="mm"):
+    """Draw text with anchor point."""
+    d.text((cx, cy), t, font=font, fill=fill, anchor=anchor)
+
+
 def draw_bolt(draw, x, y, size, color):
     """Draw a small lightning-bolt glyph in a size x size box at top-left (x, y).
 
@@ -128,18 +139,37 @@ LAYOUT["strip_x"] = LAYOUT["hourly_w"] + 2
 LAYOUT["strip_w"] = LAYOUT["daily_w"] - 2
 
 
-def draw_header(draw, location_name, date_str, updated_str):
-    """Draw the top header band: location - date (left), updated (center)."""
-    L = LAYOUT
-    draw.rectangle([0, 0, WIDTH, L["header_h"]], fill=BLACK)
-    font = load_font(15)
-    left = location_name + " · " + date_str if location_name else date_str
-    draw.text((10, L["header_h"] / 2 - 8), left, font=font, fill=WHITE)
-    updated = "Updated " + updated_str
-    draw_centered_text(draw, updated, L["hourly_w"] / 2 + 120, L["header_h"] / 2,
-                       load_font(12), (200, 200, 200))
-    draw_centered_text(draw, "10-DAY FORECAST", L["hourly_w"] + L["daily_w"] / 2,
-                       L["header_h"] / 2, load_font(11), (210, 210, 210))
+def draw_header(draw, location, date_str, updated_str, badge):
+    """Draw the header band with location, date, confidence badge, and updated time."""
+    _ctext(draw, (location or "").upper(), 20, 20, display_font(26, 600), INK, anchor="lm")
+    w = draw.textlength((location or "").upper(), font=display_font(26, 600))
+    _ctext(draw, date_str, 28 + w, 22, display_font(14, 300), GRAY, anchor="lm")
+    if badge:
+        label, accent = badge
+        _ctext(draw, "◈ " + label, WIDTH - 20, 15, display_font(11, 600),
+               ACCENTS.get(accent, GRAY), anchor="rm")
+    _ctext(draw, updated_str + " · NEXT 12H", WIDTH - 20, 30, display_font(11, 300), GRAY, anchor="rm")
+    draw.line([20, HEADER_RULE_Y, WIDTH - 20, HEADER_RULE_Y], fill=INK, width=2)
+
+
+def _draw_card(draw, x, y, w, h, card):
+    """Draw a single card with category, verdict, and detail."""
+    accent = ACCENTS.get(card["accent"], INK)
+    _ctext(draw, card["cat"], x + 14, y + 15, display_font(13, 600), accent, anchor="lm")
+    vf = display_font(30 if len(card["verdict"]) <= 15 else 26, 600)
+    _ctext(draw, card["verdict"], x + 14, y + 45, vf, INK, anchor="lm")
+    _ctext(draw, card["detail"], x + 14, y + h - 13, display_font(13, 300), GRAY, anchor="lm")
+
+
+def draw_banner(draw, cards):
+    """Draw 2-3 cards across the banner."""
+    cw = (WIDTH - 40) / 3
+    for i, card in enumerate(cards):
+        x = 20 + i * cw
+        _draw_card(draw, x, BANNER_Y, cw, BANNER_H, card)
+        if i > 0:
+            draw.line([x, BANNER_Y + 8, x, BANNER_Y + BANNER_H - 8], fill=FAINT, width=1)
+    draw.line([20, BANNER_Y + BANNER_H, WIDTH - 20, BANNER_Y + BANNER_H], fill=INK, width=1)
 
 
 def draw_hourly_panel(img, draw, hours, icons):
