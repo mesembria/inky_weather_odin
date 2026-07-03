@@ -35,3 +35,21 @@ def test_confidence_tight_band_is_high():
     bands = [(70, 71, 73, 74)] * 12
     label, accent = advice.confidence(bands)
     assert label == "HIGH CONFIDENCE" and accent == "green"
+
+
+def test_daytime_storm_scores_high():
+    hrs = _hours([78]*12, thunder=65, pop=90)
+    cards = dict((s, c["verdict"]) for s, c in advice._situational(hrs, 5, 20))
+    assert any(v.startswith("T-storms") for v in cards.values())
+
+
+def test_overnight_storm_uses_windows_shut():
+    hrs = _hours([64]*12, day=False, thunder=40, pop=80)
+    cards = [c for _, c in advice._situational(hrs, 5, 20) if c["cat"] == "OVERNIGHT"]
+    assert cards and cards[0]["verdict"] == "Storms overnight"
+
+
+def test_rain_card_is_daytime_timing():
+    hrs = _hours([60]*12, pop=70)
+    rain = [c for _, c in advice._situational(hrs, 5, 20) if c["cat"] == "OUTDOORS"]
+    assert rain and rain[0]["verdict"].startswith("Rain ")

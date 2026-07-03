@@ -57,3 +57,92 @@ def temp_card(hours):
     if hi >= 33:
         return _card("DRESS", "Cold", "{}-{}° · coat{}".format(lo, hi, frost), "blue")
     return _card("DRESS", "Frigid", "{}-{}° · bundle up".format(lo, hi), "blue")
+
+
+def _w0(hs):
+    return hs[0]["ampm_label"].lower()
+
+
+def _w1(hs):
+    return hs[-1]["ampm_label"].lower()
+
+
+def _situational(hours, gust, aqi):
+    """Daytime-framed hazard cards + one OVERNIGHT roll-up. Returns [(score, card)]."""
+    C = []
+    day_h = [h for h in hours if h["is_daytime"]]
+    night_h = [h for h in hours if not h["is_daytime"]]
+    ice_day = [h for h in day_h if h["precip_type"] in ICE_TYPES and h["pop"] >= 30]
+    snow_day = [h for h in day_h if h["precip_type"] == "SNOW" and h["pop"] >= 30]
+    wet_day = [h for h in day_h if h["pop"] >= 50
+               and h["precip_type"] not in ICE_TYPES + ("SNOW",)]
+    uvmax = max((h["uv"] for h in day_h), default=0)
+    dstorm = max(day_h, key=lambda h: h["thunder"]) if day_h else None
+    dthun = dstorm["thunder"] if dstorm else 0
+
+    if ice_day:
+        C.append((97, _card("ICE", "Ice {}-{}".format(_w0(ice_day), _w1(ice_day)),
+                            "Icy roads · avoid driving", "purple")))
+    if snow_day:
+        C.append((95, _card("SNOW", "Snow {}".format("all day" if len(snow_day) >= 8 else _w0(snow_day)),
+                            "{}\" likely · roads slick".format(6 if len(snow_day) >= 8 else 3), "purple")))
+    if dthun >= 45:
+        C.append((90, _card("STORMS", "T-storms {}".format(dstorm["ampm_label"].lower()),
+                            "{}% · brief, heavy".format(dthun), "red")))
+    elif dthun >= 25:
+        C.append((68, _card("STORMS", "Stray storm {}".format(dstorm["ampm_label"].lower()),
+                            "{}% · mainly dry".format(dthun), "orange")))
+    if aqi >= 150:
+        C.append((88, _card("SMOKE", "Unhealthy air", "AQI {} · stay indoors".format(aqi), "purple")))
+    elif aqi >= 100:
+        C.append((64, _card("SMOKE", "Hazy air", "AQI {} · limit exertion".format(aqi), "orange")))
+    if gust >= 35:
+        C.append((80, _card("WIND", "Gusty", "Gusts {} mph · secure loose items".format(gust), "orange")))
+    elif gust >= 25:
+        C.append((56, _card("WIND", "Breezy", "Gusts {} mph".format(gust), "blue")))
+    if wet_day:
+        C.append((72, _card("OUTDOORS", "Rain {}-{}".format(_w0(wet_day), _w1(wet_day)),
+                            "{}% · umbrella".format(max(h["pop"] for h in wet_day)), "blue")))
+    if day_h and uvmax >= 9:
+        C.append((60, _card("SUN", "Extreme UV", "Index {} · cover up".format(uvmax), "red")))
+    elif day_h and uvmax >= 6:
+        C.append((44, _card("SUN", "Strong UV", "Index {} midday · hat+SPF".format(uvmax), "orange")))
+
+    T = [h["temp_f"] for h in hours]
+    half = T[len(T) // 2:]
+    base = len(T) // 2
+    lo_late, hi_late = min(half), max(half)
+    cool_sw, warm_sw = T[0] - lo_late, hi_late - T[0]
+    if warm_sw >= 18 and warm_sw >= cool_sw:
+        j = base + half.index(hi_late)
+        C.append((58, _card("TREND", "Warming up",
+                            "{}°→{}° by {}".format(T[0], hi_late, hours[j]["ampm_label"].lower()), "orange")))
+    elif cool_sw >= 18:
+        j = base + half.index(lo_late)
+        C.append((58, _card("TREND", "Cooling off",
+                            "{}°→{}° by {}".format(T[0], lo_late, hours[j]["ampm_label"].lower()), "blue")))
+
+    if night_h:
+        nlo = min(h["temp_f"] for h in night_h)
+        nstorm = max(h["thunder"] for h in night_h)
+        nwet = any(h["pop"] >= 50 and h["precip_type"] not in ICE_TYPES + ("SNOW",) for h in night_h)
+        nsnow = any(h["precip_type"] == "SNOW" and h["pop"] >= 30 for h in night_h)
+        nice = any(h["precip_type"] in ICE_TYPES and h["pop"] >= 30 for h in night_h)
+        if nice and not ice_day:
+            card, sc = _card("OVERNIGHT", "Ice overnight", "Low {}° · icy roads AM".format(nlo), "purple"), 88
+        elif nstorm >= 30 and dthun < 25:
+            card, sc = _card("OVERNIGHT", "Storms overnight", "Low {}° · windows shut".format(nlo), "red"), 85
+        elif nsnow and not snow_day:
+            card, sc = _card("OVERNIGHT", "Snow overnight", "Low {}° · roads slick AM".format(nlo), "purple"), 82
+        elif nwet and not wet_day:
+            card, sc = _card("OVERNIGHT", "Rain overnight", "Low {}° · windows shut".format(nlo), "blue"), 60
+        elif nlo <= 45:
+            card, sc = _card("OVERNIGHT", "Cold night", "Low {}° · heat on".format(nlo), "blue"), 55
+        elif nlo >= 70:
+            card, sc = _card("OVERNIGHT", "Warm night", "Low {}° · stuffy, fan on".format(nlo), "orange"), 50
+        elif nlo <= 68:
+            card, sc = _card("OVERNIGHT", "Windows open", "Low {}° · comfortable".format(nlo), "green"), 50
+        else:
+            card, sc = _card("OVERNIGHT", "Mild night", "Low {}°".format(nlo), "green"), 50
+        C.append((sc, card))
+    return C
