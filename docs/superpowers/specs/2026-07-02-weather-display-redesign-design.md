@@ -55,11 +55,11 @@ to the deterministic line with no band (the display must never crash on a partia
 1. **Header band (~40px).** Location (condensed caps) + date on the left. On the right: a
    **confidence badge** (`◆ HIGH CONFIDENCE` / `◈ MIXED` / `◇ LOW AGREEMENT`, colored) over
    a small `updated · NEXT 12H` line. A 2px rule under the header.
-2. **Advice banner (~132px).** Three equal cards side by side, separated by thin rules.
-   Each card is **typographic, no icon**: a colored category label (e.g. `STORMS`), a large
-   condensed verdict (`T-storms 2p`), and a small gray supporting detail (`65% · brief,
-   heavy`). A 1px rule under the banner.
-3. **Ensemble graph (remaining ~270px, full width).** See §6.
+2. **Advice banner (~104px).** Three equal cards side by side, separated by thin rules.
+   Each card is **typographic, no icon**: a colored category label (e.g. `STORMS`) with the
+   large condensed verdict (`T-storms 2p`) pulled up directly beneath it, and a small gray
+   supporting detail (`65% · brief, heavy`) along the bottom. A 1px rule under the banner.
+3. **Ensemble graph (remaining ~325px, full width).** See §6.
 
 Rationale for Layout B over the sidebar variant (Layout A): the full-width graph gives the
 ensemble bands room to read, which matters most for the data-geek half.
@@ -74,7 +74,7 @@ ensemble bands room to read, which matters most for the data-geek half.
   a **priority score**; the two highest fill the remaining slots, rendered left→right by score.
 
 This kept the display relevant across every test: Phoenix → heat / UV / warm-night; Denver →
-bundle-up / snow / wind; Seattle → cool-damp / wet-window / overnight; Sacramento → hot /
+bundle-up / snow / wind; Seattle → cool-damp / daytime-rain / overnight; Sacramento → hot /
 smoke / warm-night; Chicago → cool / gusty / turning-colder; plus the two original storm days.
 
 **Slot 1 — temperature card.** A plain **state line keyed on the day's high** (like every other
@@ -87,12 +87,14 @@ when humid / wet.
 | ≥ 100° | `Dangerous heat` | `90–112° · hydrate, shade` |
 | ≥ 90° | `Hot` | `80–98° · UV n, shade` |
 | ≥ 80° | `Warm` / `Warm & muggy` | `63–81° · pleasant` / `· humid` |
-| ≥ 62° | `Mild` | `52–61° · easy layers` |
+| ≥ 62° | `Mild` | `52–66° · easy layers` |
 | ≥ 48° | `Cool` / `Cool & damp` | `47–54° · layers` |
-| ≥ 33° | `Cold` | `35–46° · coat` (+ `· frost AM`) |
+| ≥ 33° | `Cold` | `31–46° · coat · frost AM` |
 | < 33° (freezing all day) | `Frigid` | `20–30° · bundle up` |
 
-The 33–47° range — previously mislabeled `Cool` — now gets its own **`Cold`** band.
+The 33–47° range — previously mislabeled `Cool` — now gets its own **`Cold`** band. `· frost AM`
+is appended in the **Cold** band when the low ≤ 32° (as in the example above); **Frigid** omits
+it because `bundle up` already subsumes the sub-freezing morning.
 
 **Slots 2–3 — situational cards (first-draft triggers & scores; higher wins).**
 
@@ -161,7 +163,7 @@ Full-width temperature graph with a precip strip along the bottom.
 - **Condition icons.** Google's official icon for **every hour**, in a row above the plot.
 - **No explainer caption.** The `band = ensemble …` text in the mockups is an annotation for
   review only; the real render omits it (at most a small one-line legend, TBD).
-- **Precip strip (bottom ~54px).** Per-hour rain chance with ensemble spread. **Two candidate
+- **Precip strip (bottom ~82px).** Per-hour rain chance with ensemble spread. **Two candidate
   styles, to be chosen during implementation on the real panel:**
   - *Floating box-plot* — light bar p10–p90, solid core p25–p75, median tick. Honest about the
     lower bound; can look odd floating off the baseline.
