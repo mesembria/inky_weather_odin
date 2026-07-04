@@ -156,8 +156,9 @@ disagreement only when it's genuinely wide.
 **Ties are broken by a fixed card-type precedence, high→low:** `ICE, SNOW, STORMS, SMOKE, WIND,
 RAIN, UV, TREND`, then overnight precip, then overnight comfort, then the info tier
 (`SWING, MOON, calm nudge, DAYLIGHT`). Within the same type, **daytime precedes overnight.** This
-makes the two chosen cards deterministic for any input (e.g. the `UV` / `overnight rain` tie at 60
-resolves to `overnight rain`, since precip outranks UV).
+makes the two chosen cards deterministic for any input (e.g. a `UV` vs `overnight rain` tie at 60
+resolves to `UV`, since `SUN` precedes `OVERNIGHT` in the list above; note daytime precip still
+outranks UV because `OUTDOORS` precedes `SUN`).
 
 These bands/scores/wording live in `config.py` so they can be tuned after living with the
 display — this is the "make or break" layer and is expected to keep evolving. If a data field
