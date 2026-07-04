@@ -83,13 +83,13 @@ def draw_header(draw, location, date_str, updated_str, badge):
     """Draw the header band with location, date, confidence badge, and updated time."""
     _ctext(draw, (location or "").upper(), 20, 20, display_font(26, 600), INK, anchor="lm")
     w = draw.textlength((location or "").upper(), font=display_font(26, 600))
-    _ctext(draw, date_str, 28 + w, 22, display_font(14, 300), GRAY, anchor="lm")
+    _ctext(draw, date_str, 28 + w, 22, display_font(15, 600), INK, anchor="lm")
     if badge:
         label, accent = badge
         glyph = _BADGE_GLYPH.get(label, "◇")
-        _ctext(draw, glyph + " " + label, WIDTH - 20, 15, display_font(11, 600),
-               ACCENTS.get(accent, GRAY), anchor="rm")
-    _ctext(draw, updated_str + " · NEXT 12H", WIDTH - 20, 30, display_font(11, 300), GRAY, anchor="rm")
+        _ctext(draw, glyph + " " + label, WIDTH - 20, 15, display_font(12, 600),
+               ACCENTS.get(accent, INK), anchor="rm")
+    _ctext(draw, updated_str + " · NEXT 12H", WIDTH - 20, 30, display_font(12, 600), INK, anchor="rm")
     draw.line([20, HEADER_RULE_Y, WIDTH - 20, HEADER_RULE_Y], fill=INK, width=2)
 
 
@@ -99,7 +99,7 @@ def _draw_card(draw, x, y, w, h, card):
     _ctext(draw, card["cat"], x + 14, y + 15, display_font(13, 600), accent, anchor="lm")
     vf = display_font(30 if len(card["verdict"]) <= 15 else 26, 600)
     _ctext(draw, card["verdict"], x + 14, y + 45, vf, INK, anchor="lm")
-    _ctext(draw, card["detail"], x + 14, y + h - 13, display_font(13, 300), GRAY, anchor="lm")
+    _ctext(draw, card["detail"], x + 14, y + h - 13, display_font(14, 600), INK, anchor="lm")
 
 
 def draw_banner(draw, cards):
@@ -109,7 +109,7 @@ def draw_banner(draw, cards):
         x = 20 + i * cw
         _draw_card(draw, x, BANNER_Y, cw, BANNER_H, card)
         if i > 0:
-            draw.line([x, BANNER_Y + 8, x, BANNER_Y + BANNER_H - 8], fill=FAINT, width=1)
+            draw.line([x, BANNER_Y + 8, x, BANNER_Y + BANNER_H - 8], fill=INK, width=1)
     draw.line([20, BANNER_Y + BANNER_H, WIDTH - 20, BANNER_Y + BANNER_H], fill=INK, width=1)
 
 
@@ -141,7 +141,7 @@ def draw_graph(img, draw, hours, bands, icons, gx, gy, gw, gh):
             continue
         gyv = Y(g)
         draw.line([lx, gyv, gx + gw, gyv], fill=(230, 231, 236), width=1)
-        _ctext(draw, "{}°".format(g), gx + 2, gyv, display_font(11, 600), (165, 168, 178), anchor="lm")
+        _ctext(draw, "{}°".format(g), gx + 2, gyv, display_font(12, 600), INK, anchor="lm")
 
     # nested ensemble band
     if has_band:
@@ -164,7 +164,7 @@ def draw_graph(img, draw, hours, bands, icons, gx, gy, gw, gh):
         col = _KIND_BAR.get(kind, BLUE)
         draw.rectangle([bx - bw, pbase - bh, bx + bw, pbase], fill=col)
         _ctext(draw, "{}%".format(pop), bx, pbase - bh - 8, display_font(12, 600), col)
-    _ctext(draw, "RAIN %", gx + 2, pbase - bandh + 2, display_font(9, 600), GRAY, anchor="lm")
+    _ctext(draw, "RAIN %", gx + 2, pbase - bandh + 2, display_font(10, 600), INK, anchor="lm")
 
     # temp line + points + labels + icons
     ys = [Y(t) for t in temps]
@@ -177,9 +177,9 @@ def draw_graph(img, draw, hours, bands, icons, gx, gy, gw, gh):
             img.paste(icons[i], (int(x - 14), int(top - 32)), icons[i])
 
     # x axis
-    draw.line([lx, axis_y, gx + gw, axis_y], fill=(200, 200, 205), width=1)
+    draw.line([lx, axis_y, gx + gw, axis_y], fill=INK, width=1)
     for i, h in enumerate(hours):
-        _ctext(draw, h["ampm_label"], xs[i], axis_y + 8, display_font(12, 300), GRAY)
+        _ctext(draw, h["ampm_label"], xs[i], axis_y + 8, display_font(12, 600), INK)
 
 
 def render_display(hours, bands, hour_icons, cards, badge,
@@ -199,5 +199,5 @@ def render_error(message):
     draw.rectangle([0, 0, WIDTH, 30], fill=RED)
     draw.text((10, 7), "Weather update failed", font=display_font(15, 600), fill=WHITE)
     _ctext(draw, message, WIDTH / 2, HEIGHT / 2, display_font(18, 600), INK)
-    _ctext(draw, "Will retry next hour", WIDTH / 2, HEIGHT / 2 + 34, display_font(13, 300), GRAY)
+    _ctext(draw, "Will retry next hour", WIDTH / 2, HEIGHT / 2 + 34, display_font(14, 600), INK)
     return img
