@@ -7,6 +7,7 @@ import datetime
 import math
 
 ICE_TYPES = ("ICE", "SLEET", "FREEZING_RAIN")
+MUGGY_DEWPOINT_F = 60   # daytime dew point at/above this reads as "muggy"
 
 
 def _card(cat, verdict, detail, accent):
@@ -36,10 +37,12 @@ def confidence(bands):
 def temp_card(hours):
     """Slot-1 'what to wear' card: a plain state line keyed on the day's high."""
     T = [h["temp_f"] for h in hours]
-    FL = [h["feels_f"] for h in hours]
     hi, lo = max(T), min(T)
     uvmax = max(h["uv"] for h in hours)
-    muggy = any(f > t + 2 for f, t in zip(FL, T))
+    # "muggy" is a humidity call, so key it on daytime dew point (≥ 60°F feels
+    # sticky) — not feels-like vs temp, which mislabels dry days as muggy.
+    day_dp = [h["dew_f"] for h in hours if h.get("is_daytime") and h.get("dew_f") is not None]
+    muggy = bool(day_dp) and max(day_dp) >= MUGGY_DEWPOINT_F
     wet = any(h["pop"] >= 50 for h in hours)
     frost = " · frost AM" if lo <= 32 else ""
     if hi >= 100:

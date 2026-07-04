@@ -2,15 +2,18 @@ import datetime
 from inky_weather import advice
 
 
-def _hours(temps, feels=None, day=True, pop=0, ptype="RAIN", thunder=0, uv=3):
+def _hours(temps, feels=None, day=True, pop=0, ptype="RAIN", thunder=0, uv=3, dew=None):
     feels = feels or temps
     out = []
     for i, (t, f) in enumerate(zip(temps, feels)):
         h = (9 + i) % 24
-        out.append({"hour": h, "ampm_label": "{}{}".format(h % 12 or 12,
-                    "a" if h < 12 else "p"), "is_daytime": day, "condition": "CLEAR",
-                    "icon_uri": "", "temp_f": t, "feels_f": f, "pop": pop,
-                    "precip_type": ptype, "thunder": thunder, "uv": uv})
+        hr = {"hour": h, "ampm_label": "{}{}".format(h % 12 or 12,
+              "a" if h < 12 else "p"), "is_daytime": day, "condition": "CLEAR",
+              "icon_uri": "", "temp_f": t, "feels_f": f, "pop": pop,
+              "precip_type": ptype, "thunder": thunder, "uv": uv}
+        if dew is not None:
+            hr["dew_f"] = dew
+        out.append(hr)
     return out
 
 
@@ -20,10 +23,17 @@ def test_temp_card_cold_band_fills_30s_40s():
     assert c["cat"] == "DRESS"
 
 
-def test_temp_card_warm_muggy():
-    c = advice.temp_card(_hours([80, 82, 83, 84, 83, 82, 81, 80, 79, 78, 77, 76],
-                                feels=[86, 88, 89, 90, 89, 88, 87, 86, 85, 84, 83, 82]))
+def test_temp_card_warm_muggy_from_dewpoint():
+    # warm day with a high daytime dew point -> muggy
+    c = advice.temp_card(_hours([80, 82, 83, 84, 83, 82, 81, 80, 79, 78, 77, 76], dew=66))
     assert c["verdict"] == "Warm & muggy"
+
+
+def test_temp_card_warm_dry_not_muggy():
+    # a dry-CO-style warm day: high feels-like but LOW dew point -> not muggy
+    c = advice.temp_card(_hours([80, 82, 83, 84, 83, 82, 81, 80, 79, 78, 77, 76],
+                                feels=[86, 88, 89, 90, 89, 88, 87, 86, 85, 84, 83, 82], dew=48))
+    assert c["verdict"] == "Warm"
 
 
 def test_moon_full_is_high():

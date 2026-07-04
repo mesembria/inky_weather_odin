@@ -125,11 +125,12 @@ def draw_graph(img, draw, hours, bands, icons, gx, gy, gw, gh):
     axis_y = gy + gh - 16
     top = gy + 40
     plot_h = (axis_y - bandh) - top
+    pad_top = 24        # headroom so the highest point's label clears the icon row
     lx = gx + 30
     xs = [lx + (gw - 32) * (i + 0.5) / n for i in range(n)]
 
     def Y(t):
-        return top + plot_h * (1 - (t - mn) / rng)
+        return (top + pad_top) + (plot_h - pad_top) * (1 - (t - mn) / rng)
 
     # temp gridlines + labels
     lo10 = int((mn // 10) * 10)

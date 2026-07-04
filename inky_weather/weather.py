@@ -255,6 +255,22 @@ def load_ensemble_fixture(fixture_dir, first_hour, count=12):
         return parse_ensemble(json.load(f), first_hour, count)
 
 
+def recenter_bands(bands, temps):
+    """Anchor each ensemble band on the deterministic (Google) temperature.
+
+    The ensemble is a different model and can be mean-biased vs the trusted
+    deterministic source, so we keep only its *spread* (a fair estimate of the
+    forecast's uncertainty magnitude) and discard its mean: each band is shifted
+    so its inner-IQR center sits on that hour's temperature. Width is preserved,
+    so the deterministic line always lies inside the band.
+    """
+    out = []
+    for (p10, p25, p75, p90), t in zip(bands, temps):
+        d = t - (p25 + p75) / 2
+        out.append((round(p10 + d), round(p25 + d), round(p75 + d), round(p90 + d)))
+    return out
+
+
 _AIRQUALITY_ENDPOINT = "https://air-quality-api.open-meteo.com/v1/air-quality"
 _FORECAST_ENDPOINT = "https://api.open-meteo.com/v1/forecast"
 
@@ -315,3 +331,35 @@ def fetch_sun(lat, long, timeout=20):
     resp = requests.get(sun_url(lat, long), timeout=timeout)
     resp.raise_for_status()
     return parse_sun(resp.json())
+
+
+def parse_dewpoint(data, first_hour, count=12):
+    """Per-hour dew point (°F, rounded), aligned to first_hour. None where absent."""
+    hourly = data.get("hourly", {})
+    times = hourly.get("time", [])
+    dp = hourly.get("dew_point_2m", [])
+    if not times:
+        return []
+    start = _align_index(times, first_hour)
+    out = []
+    for i in range(start, min(start + count, len(times))):
+        v = dp[i] if i < len(dp) and dp[i] is not None else None
+        out.append(round(v) if v is not None else None)
+    return out
+
+
+def dewpoint_url(lat, long):
+    params = {"latitude": lat, "longitude": long, "hourly": "dew_point_2m",
+              "temperature_unit": "fahrenheit", "timezone": "auto", "forecast_days": 2}
+    return "{}?{}".format(_FORECAST_ENDPOINT, urlencode(params))
+
+
+def fetch_dewpoint(lat, long, first_hour, count=12, timeout=20):
+    resp = requests.get(dewpoint_url(lat, long), timeout=timeout)
+    resp.raise_for_status()
+    return parse_dewpoint(resp.json(), first_hour, count)
+
+
+def load_dewpoint_fixture(fixture_dir, first_hour, count=12):
+    with open(os.path.join(fixture_dir, "openmeteo_dewpoint.json")) as f:
+        return parse_dewpoint(json.load(f), first_hour, count)

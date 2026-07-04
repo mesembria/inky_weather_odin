@@ -233,6 +233,29 @@ def test_percentile_interpolates():
     assert weather.percentile([10, 20, 30, 40], 50) == 25
 
 
+def test_recenter_bands_centers_on_temp_and_preserves_width():
+    # ensemble band centered near 75 (inner-IQR midpoint), width 10
+    bands = [(70, 72, 78, 80)]
+    out = weather.recenter_bands(bands, [82])
+    p10, p25, p75, p90 = out[0]
+    assert p25 <= 82 <= p75          # deterministic temp now inside the inner band
+    assert p10 <= 82 <= p90          # ...and the outer band
+    assert (p90 - p10) == 10         # spread width preserved (mean bias discarded)
+
+
+def test_dewpoint_url_contains_params():
+    url = weather.dewpoint_url("40.0", "-105.0")
+    assert "dew_point_2m" in url
+    assert "temperature_unit=fahrenheit" in url
+    assert "timezone=auto" in url
+
+
+def test_parse_dewpoint_aligns():
+    data = {"hourly": {"time": ["2026-07-03T12:00", "2026-07-03T13:00"],
+                       "dew_point_2m": [48.0, 61.0]}}
+    assert weather.parse_dewpoint(data, first_hour=13, count=2) == [61]
+
+
 def test_parse_ensemble_aligns_and_summarizes():
     data = {"hourly": {
         "time": ["2026-07-03T12:00", "2026-07-03T13:00", "2026-07-03T14:00"],

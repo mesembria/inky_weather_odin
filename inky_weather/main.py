@@ -35,8 +35,10 @@ def _icons_for(items, size):
 def build_image(use_fixture, cfg):
     if use_fixture:
         hours, _days = weather.load_from_fixtures(FIXTURE_DIR)
-        bands, gust = weather.load_ensemble_fixture(FIXTURE_DIR, hours[0]["hour"])
-        aqi = weather.load_airquality_fixture(FIXTURE_DIR, hours[0]["hour"])
+        fh = hours[0]["hour"]
+        bands, gust = weather.load_ensemble_fixture(FIXTURE_DIR, fh)
+        aqi = weather.load_airquality_fixture(FIXTURE_DIR, fh)
+        dew = weather.load_dewpoint_fixture(FIXTURE_DIR, fh)
         sun = {"sunset": "8p", "sunrise": "6a"}
     else:
         hours, _days = weather.fetch_live(cfg["lat"], cfg["long"], cfg["google_weather_key"])
@@ -46,6 +48,16 @@ def build_image(use_fixture, cfg):
         bands, gust = bands_gust
         aqi = _safe(lambda: weather.fetch_air_quality(cfg["lat"], cfg["long"], fh), default=[])
         sun = _safe(lambda: weather.fetch_sun(cfg["lat"], cfg["long"]), default={})
+        dew = _safe(lambda: weather.fetch_dewpoint(cfg["lat"], cfg["long"], fh), default=[])
+
+    # Anchor the ensemble spread on the trusted (Google) temps so the line always
+    # sits inside its band (the two are different models — keep spread, drop bias).
+    if bands:
+        bands = weather.recenter_bands(bands, [h["temp_f"] for h in hours])
+    # Attach dew point so the advice layer can judge mugginess from humidity.
+    for i, h in enumerate(hours):
+        if i < len(dew) and dew[i] is not None:
+            h["dew_f"] = dew[i]
 
     hour_icons = _icons_for(hours, render.ICON_SZ_HOUR)
     now = datetime.datetime.now()
