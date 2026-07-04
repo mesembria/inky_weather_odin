@@ -7,30 +7,24 @@ from PIL import Image, ImageChops, ImageFilter
 INK = (20, 22, 28)
 
 
-def flatten_for_eink(img):
-    """Make a transparent icon legible on white e-ink paper.
+def flatten_for_eink(img, size):
+    """Make a transparent icon legible on white e-ink paper, as a size×size tile.
 
     Google's icons are drawn for dark UIs: cloud fills are white and vanish on
-    paper. Recolor near-white / near-neutral opaque pixels to ink (keeping
-    saturated accents like the sun's yellow), then trace the silhouette with a
-    1px ink outline so even light shapes have a defined edge.
+    paper. Rather than fill them (which turns clouds into solid blobs), trace
+    the silhouette with a dark outline so shapes read as line-art while keeping
+    saturated accents like the sun's yellow. The content is inset by 1px so the
+    outline always stays inside the tile and never clips at the edge.
     """
     img = img.convert("RGBA")
-    px = img.load()
-    w, h = img.size
-    for y in range(h):
-        for x in range(w):
-            r, g, b, a = px[x, y]
-            if a < 40:
-                continue
-            sat = max(r, g, b) - min(r, g, b)
-            if sat < 45 and max(r, g, b) > 150:      # white/light-neutral fill
-                px[x, y] = (INK[0], INK[1], INK[2], a)
-    mask = img.split()[3].point(lambda v: 255 if v > 60 else 0)
+    inner = img.resize((size - 2, size - 2), Image.LANCZOS)
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    canvas.paste(inner, (1, 1), inner)
+    mask = canvas.split()[3].point(lambda v: 255 if v > 60 else 0)
     ring = ImageChops.subtract(mask.filter(ImageFilter.MaxFilter(3)), mask)
-    outline = Image.new("RGBA", img.size, INK + (0,))
+    outline = Image.new("RGBA", canvas.size, INK + (0,))
     outline.putalpha(ring)
-    return Image.alpha_composite(outline, img)
+    return Image.alpha_composite(outline, canvas)
 
 
 def cache_path(icon_uri, cache_dir):
@@ -60,7 +54,7 @@ def get_icon(icon_uri, size, cache_dir):
     try:
         if not os.path.exists(path):
             _download(icon_uri, path)
-        img = Image.open(path).convert("RGBA").resize((size, size), Image.LANCZOS)
-        return flatten_for_eink(img)
+        img = Image.open(path).convert("RGBA")
+        return flatten_for_eink(img, size)
     except (requests.RequestException, OSError):
         return blank
