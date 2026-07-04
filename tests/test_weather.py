@@ -171,6 +171,25 @@ def test_daily_url_contains_params():
     assert "key=ABC" in url
 
 
+def test_ensemble_url_contains_params():
+    url = weather.ensemble_url("40.0", "-105.0")
+    assert "temperature_unit=fahrenheit" in url
+    assert "wind_speed_unit=mph" in url
+    assert "timezone=auto" in url
+
+
+def test_air_quality_url_contains_params():
+    url = weather.air_quality_url("40.0", "-105.0")
+    assert "us_aqi" in url
+    assert "timezone=auto" in url
+
+
+def test_sun_url_contains_params():
+    url = weather.sun_url("40.0", "-105.0")
+    assert "sunrise" in url and "sunset" in url
+    assert "timezone=auto" in url
+
+
 def test_load_fixtures_returns_parsed():
     hours, days = weather.load_from_fixtures(FIXTURE_DIR)
     assert len(hours) == 12

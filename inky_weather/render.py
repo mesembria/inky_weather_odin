@@ -34,6 +34,8 @@ FAINT = (225, 226, 230)
 ACCENTS = {"red": RED, "orange": ORANGE, "blue": BLUE, "green": GREEN,
            "purple": PURPLE, "ink": INK, "gray": GRAY}
 
+_BADGE_GLYPH = {"HIGH CONFIDENCE": "◆", "MIXED CONFIDENCE": "◈", "LOW AGREEMENT": "◇"}
+
 _FONT_PATH = os.path.join(os.path.dirname(__file__), "assets", "fonts", "Oswald.ttf")
 
 
@@ -84,7 +86,8 @@ def draw_header(draw, location, date_str, updated_str, badge):
     _ctext(draw, date_str, 28 + w, 22, display_font(14, 300), GRAY, anchor="lm")
     if badge:
         label, accent = badge
-        _ctext(draw, "◈ " + label, WIDTH - 20, 15, display_font(11, 600),
+        glyph = _BADGE_GLYPH.get(label, "◇")
+        _ctext(draw, glyph + " " + label, WIDTH - 20, 15, display_font(11, 600),
                ACCENTS.get(accent, GRAY), anchor="rm")
     _ctext(draw, updated_str + " · NEXT 12H", WIDTH - 20, 30, display_font(11, 300), GRAY, anchor="rm")
     draw.line([20, HEADER_RULE_Y, WIDTH - 20, HEADER_RULE_Y], fill=INK, width=2)

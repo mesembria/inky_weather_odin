@@ -1,7 +1,7 @@
 """Pure advice logic: turn parsed forecast numbers into <=3 ranked cards.
 
 A card is a dict {"cat", "verdict", "detail", "accent"} where accent is one of
-"red"|"orange"|"blue"|"green"|"purple"|"ink" (render maps names to RGB).
+"red"|"orange"|"blue"|"green"|"purple"|"ink"|"gray" (render maps names to RGB).
 """
 import datetime
 import math
