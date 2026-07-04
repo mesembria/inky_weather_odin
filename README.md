@@ -1,8 +1,10 @@
 # Inky Impression Weather Display
 
-Raspberry Pi + Pimoroni Inky Impression 7.3" weather display. Fetches Google
-Maps Platform Weather forecasts and renders a 12-hour hourly panel plus a
-10-day strip. Refreshes hourly via cron.
+Raspberry Pi + Pimoroni Inky Impression 7.3" weather display. Renders an advice
+card banner (what-to-wear, rain, storms, overnight, etc.) overlaid on a full-width
+ensemble temperature graph. Fetches deterministic forecasts and condition icons
+from Google Weather API, plus ensemble spread confidence, wind gusts, sunrise/sunset,
+and US Air Quality Index from Open-Meteo (no API key required). Refreshes hourly via cron.
 
 ## Hardware
 - Raspberry Pi (Pi 4 for dev, Pi Zero 2W recommended for the final install — needs a pre-soldered header)
