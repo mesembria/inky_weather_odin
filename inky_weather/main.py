@@ -34,14 +34,15 @@ def _icons_for(items, size):
 
 def build_image(use_fixture, cfg):
     if use_fixture:
-        hours, _days = weather.load_from_fixtures(FIXTURE_DIR)
+        hours, days = weather.load_from_fixtures(FIXTURE_DIR)
         fh = hours[0]["hour"]
         bands, gust = weather.load_ensemble_fixture(FIXTURE_DIR, fh)
         aqi = weather.load_airquality_fixture(FIXTURE_DIR, fh)
         dew = weather.load_dewpoint_fixture(FIXTURE_DIR, fh)
+        trend = weather.load_trend_daily_fixture(FIXTURE_DIR)
         sun = {"sunset": "8p", "sunrise": "6a"}
     else:
-        hours, _days = weather.fetch_live(cfg["lat"], cfg["long"], cfg["google_weather_key"])
+        hours, days = weather.fetch_live(cfg["lat"], cfg["long"], cfg["google_weather_key"])
         fh = hours[0]["hour"]
         bands_gust = _safe(lambda: weather.fetch_ensemble(cfg["lat"], cfg["long"], fh),
                            default=([], []))
@@ -49,6 +50,7 @@ def build_image(use_fixture, cfg):
         aqi = _safe(lambda: weather.fetch_air_quality(cfg["lat"], cfg["long"], fh), default=[])
         sun = _safe(lambda: weather.fetch_sun(cfg["lat"], cfg["long"]), default={})
         dew = _safe(lambda: weather.fetch_dewpoint(cfg["lat"], cfg["long"], fh), default=[])
+        trend = _safe(lambda: weather.fetch_trend_daily(cfg["lat"], cfg["long"]), default=[])
 
     # Anchor the ensemble spread on the trusted (Google) temps so the line always
     # sits inside its band (the two are different models — keep spread, drop bias).
@@ -61,7 +63,7 @@ def build_image(use_fixture, cfg):
 
     hour_icons = _icons_for(hours, render.ICON_SZ_HOUR)
     now = datetime.datetime.now()
-    cards = advice.build_cards(hours, bands, gust, aqi, sun, now.date())
+    cards = advice.build_cards(hours, bands, gust, aqi, sun, now.date(), days=days, trend=trend)
     badge = advice.confidence(bands)
     return render.render_display(
         hours, bands, hour_icons, cards, badge,

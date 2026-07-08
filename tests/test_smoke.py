@@ -21,3 +21,21 @@ def test_fixture_render_end_to_end(tmp_path):
     out = tmp_path / "out.png"
     main.main(["--fixture", "--out", str(out)])
     assert Image.open(out).size == (800, 480)
+
+
+def test_fixture_trend_card_present():
+    # the bundled trend fixture loads into a window that yields a TREND card
+    from inky_weather import weather, advice, main
+    window = weather.load_trend_daily_fixture(main.FIXTURE_DIR)
+    result = advice._trend_card(window)
+    assert result is not None
+    assert result[1]["cat"] == "TREND"
+
+
+def test_fixture_trend_absent_on_missing_data():
+    import datetime
+    from inky_weather import weather, advice, main
+    hours, days = weather.load_from_fixtures(main.FIXTURE_DIR)
+    cards = advice.build_cards(hours, [], [], [], {}, datetime.date(2026, 7, 7),
+                               days=days, trend=[])
+    assert not any(c["cat"] == "TREND" for c in cards)
