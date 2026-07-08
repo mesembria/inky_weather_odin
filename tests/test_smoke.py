@@ -23,19 +23,25 @@ def test_fixture_render_end_to_end(tmp_path):
     assert Image.open(out).size == (800, 480)
 
 
-def test_fixture_trend_card_present():
-    # the bundled trend fixture loads into a window that yields a TREND card
+def test_fixture_synthesizes_cooler_day_trend():
+    # fixture mode synthesizes a warmer "yesterday"; the synthesized inputs yield a
+    # "Cooler day" TREND card. (The bundled hourly fixture is a stormy day, so on the
+    # full banner hazards correctly outrank TREND — hence we assert the card contract.)
     from inky_weather import weather, advice, main
-    window = weather.load_trend_daily_fixture(main.FIXTURE_DIR)
-    result = advice._trend_card(window)
+    _hours, days = weather.load_from_fixtures(main.FIXTURE_DIR)
+    today = {"hi_f": days[0]["hi_f"], "lo_f": days[0]["lo_f"]}
+    yesterday = {"hi_f": days[0]["hi_f"] + 6, "lo_f": days[0]["lo_f"] + 4}
+    result = advice._trend_card(today, yesterday, [d["hi_f"] for d in days[1:4]])
     assert result is not None
-    assert result[1]["cat"] == "TREND"
+    assert result[1]["cat"] == "TREND" and result[1]["verdict"] == "Cooler day"
 
 
-def test_fixture_trend_absent_on_missing_data():
+def test_trend_absent_on_first_run():
+    # no persisted history yet -> trend_input yields no yesterday -> no TREND card
     import datetime
-    from inky_weather import weather, advice, main
+    from inky_weather import weather, advice, main, history
     hours, days = weather.load_from_fixtures(main.FIXTURE_DIR)
+    trend = history.trend_input(days, {}, datetime.date(2026, 7, 7))
     cards = advice.build_cards(hours, [], [], [], {}, datetime.date(2026, 7, 7),
-                               days=days, trend=[])
+                               days=days, trend=trend)
     assert not any(c["cat"] == "TREND" for c in cards)

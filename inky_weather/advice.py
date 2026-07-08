@@ -77,31 +77,36 @@ def _w1(hs):
     return hs[-1]["ampm_label"].lower()
 
 
-def _trend_card(window):
-    """Always-on day-over-day TREND card, upgrading to a window peak/dip framing.
+def _trend_card(today, yesterday, stretch_his):
+    """Day-over-day TREND card, Google-sourced, upgrading to a peak/dip framing.
 
-    `window` is the 7-day hi/lo list from weather.parse_trend_daily
-    ([t-3..t+3], today at index 3). Single-source (Open-Meteo) so the
-    day-over-day delta carries no cross-model bias. Returns (score, card) or
-    None when the window is not a full 7 days.
+    All temps come from Google (the trusted deterministic source), so the card's
+    numbers match the rest of the display and the day-over-day delta carries no
+    cross-model bias:
+      today:       {"hi_f","lo_f"} for today (Google forecast; required).
+      yesterday:   {"hi_f","lo_f"} recorded for yesterday, or None (no history yet).
+      stretch_his: highs of the surrounding days (persisted past + forward
+                   forecast), EXCLUDING today; used only for the peak/dip upgrade.
+    Returns (score, card), or None before any history has accumulated.
     """
-    if not window or len(window) != 7:
+    if not today:
         return None
-    if any(d["hi_f"] is None or d["lo_f"] is None for d in window):
+    hi = today["hi_f"]
+    # window upgrade: today a strict peak/dip of the surrounding stretch by margin.
+    # Needs >= 4 surrounding days so a pure-forecast run doesn't masquerade as a
+    # "stretch" (that overlaps OUTLOOK) — it engages once past history builds up.
+    if len(stretch_his) >= 4:
+        if hi < min(stretch_his) and min(stretch_his) - hi >= TREND_WINDOW_MARGIN:
+            return (TREND_SCORE, _card("TREND", "Coolest stretch",
+                                       "high {}° · warmer around it".format(hi), "blue"))
+        if hi > max(stretch_his) and hi - max(stretch_his) >= TREND_WINDOW_MARGIN:
+            return (TREND_SCORE, _card("TREND", "Warmest stretch",
+                                       "high {}° · cooler around it".format(hi), "orange"))
+    # default: day-over-day on the high (needs yesterday from persisted history)
+    if not yesterday:
         return None
-    today, yest = window[3], window[2]
-    his = [d["hi_f"] for d in window]
-    others = his[:3] + his[4:]
-    # window upgrade: today a strict peak/dip beating its nearest neighbor by margin
-    if today["hi_f"] < min(others) and min(others) - today["hi_f"] >= TREND_WINDOW_MARGIN:
-        return (TREND_SCORE, _card("TREND", "Coolest stretch",
-                                   "high {}° · warmer around it".format(today["hi_f"]), "blue"))
-    if today["hi_f"] > max(others) and today["hi_f"] - max(others) >= TREND_WINDOW_MARGIN:
-        return (TREND_SCORE, _card("TREND", "Warmest stretch",
-                                   "high {}° · cooler around it".format(today["hi_f"]), "orange"))
-    # default: day-over-day on the high
-    dhi = today["hi_f"] - yest["hi_f"]
-    dlo = today["lo_f"] - yest["lo_f"]
+    dhi = hi - yesterday["hi_f"]
+    dlo = today["lo_f"] - yesterday["lo_f"]
     if dhi <= -TREND_HI_BIG:
         verdict, accent = "Much cooler", "blue"
     elif dhi <= -(TREND_HI_FLAT + 1):
@@ -113,9 +118,9 @@ def _trend_card(window):
     else:
         verdict, accent = "Steady", "gray"
     if verdict == "Steady":
-        detail = "high {}° · ~ yesterday".format(today["hi_f"])
+        detail = "high {}° · ~ yesterday".format(hi)
     else:
-        detail = "high {}° ({:+d})".format(today["hi_f"], dhi)
+        detail = "high {}° ({:+d})".format(hi, dhi)
         if abs(dlo) >= TREND_LOW_DETAIL:
             detail += " · low {}° ({:+d})".format(today["lo_f"], dlo)
     return (TREND_SCORE, _card("TREND", verdict, detail, accent))
@@ -272,7 +277,7 @@ def build_cards(hours, bands, gust, aqi, sun, date, days=None, trend=None):
     has_hazard = any(s >= 50 for s, _ in scored)
     scored += _info_tier(hours, bands, sun, date, has_hazard)
     if trend:
-        t = _trend_card(trend)
+        t = _trend_card(trend["today"], trend["yesterday"], trend["stretch_his"])
         if t:
             scored.append(t)
     if days:
