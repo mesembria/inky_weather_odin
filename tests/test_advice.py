@@ -85,3 +85,149 @@ def test_build_cards_hazards_beat_info_tier():
     assert cards[0]["cat"] == "DRESS"
     assert any(c["cat"] == "STORMS" for c in cards)
     assert not any(c["cat"] in ("MOON", "DAYLIGHT") for c in cards)  # crowded out
+
+
+def test_build_cards_includes_trend():
+    hrs = _hours([60, 63, 66, 68, 70, 71, 71, 70, 68, 66, 64, 62])
+    cards = advice.build_cards(hrs, [], [], [], {"sunset": "8p"},
+                               datetime.date(2026, 7, 15),
+                               trend=_window([82, 84, 85, 78, 80, 83, 85]))
+    assert any(c["cat"] == "TREND" and c["verdict"] == "Cooler day" for c in cards)
+
+
+def test_build_cards_hazard_can_bump_trend():
+    # multiple hazards (storm + gusty wind) fill both non-DRESS slots ahead of TREND
+    hrs = _hours([78] * 12, thunder=65, pop=90)   # STORMS=90, OUTDOORS(rain)=72
+    cards = advice.build_cards(hrs, [], [40] * 12, [], {}, datetime.date(2026, 7, 15),
+                               trend=_window([82, 84, 85, 78, 80, 83, 85]))
+    assert any(c["cat"] == "STORMS" for c in cards)
+    assert not any(c["cat"] == "TREND" for c in cards)
+
+
+def test_build_cards_trend_absent_without_data():
+    hrs = _hours([60, 63, 66, 68, 70, 71, 71, 70, 68, 66, 64, 62])
+    cards = advice.build_cards(hrs, [], [], [], {"sunset": "8p"},
+                               datetime.date(2026, 7, 15), trend=[])
+    assert not any(c["cat"] == "TREND" for c in cards)
+
+
+def test_build_cards_includes_outlook():
+    hrs = _hours([60, 63, 66, 68, 70, 71, 71, 70, 68, 66, 64, 62])
+    cards = advice.build_cards(hrs, [], [], [], {}, datetime.date(2026, 7, 15),
+                               days=_days([70, 74, 78, 82]))
+    assert any(c["cat"] == "OUTLOOK" for c in cards)
+
+
+def _window(highs, lows=None):
+    lows = lows or [h - 20 for h in highs]
+    return [{"hi_f": h, "lo_f": l} for h, l in zip(highs, lows)]
+
+
+def _days(highs, names=None):
+    names = names or ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    return [{"hi_f": h, "name": n} for h, n in zip(highs, names)]
+
+
+def test_trend_card_cooler_day():
+    # today (idx 3) 7 cooler than yesterday, not a window extreme
+    s, c = advice._trend_card(_window([82, 84, 85, 78, 80, 83, 85]))
+    assert s == advice.TREND_SCORE and c["cat"] == "TREND"
+    assert c["verdict"] == "Cooler day" and c["accent"] == "blue"
+    assert c["detail"] == "high 78° (-7) · low 58° (-7)"
+
+
+def test_trend_card_appends_low_when_it_moves():
+    s, c = advice._trend_card(_window([82, 84, 85, 78, 80, 83, 85],
+                                      [60, 62, 63, 58, 59, 61, 62]))
+    assert c["detail"] == "high 78° (-7) · low 58° (-5)"
+
+
+def test_trend_card_steady_when_flat():
+    s, c = advice._trend_card(_window([80, 81, 79, 80, 81, 80, 79]))
+    assert c["verdict"] == "Steady" and c["accent"] == "gray"
+    assert c["detail"] == "high 80° · ~ yesterday"
+
+
+def test_trend_card_much_warmer():
+    s, c = advice._trend_card(_window([60, 62, 64, 76, 74, 72, 70]))
+    assert c["verdict"] == "Much warmer" and c["accent"] == "orange"
+    assert c["detail"] == "high 76° (+12) · low 56° (+12)"
+
+
+def test_trend_card_coolest_stretch_upgrade():
+    # today strictly the lowest high, beats nearest neighbor by >= 3
+    s, c = advice._trend_card(_window([84, 85, 86, 70, 80, 83, 85]))
+    assert c["verdict"] == "Coolest stretch" and c["accent"] == "blue"
+    assert c["detail"] == "high 70° · warmer around it"
+
+
+def test_trend_card_warmest_stretch_upgrade():
+    s, c = advice._trend_card(_window([70, 72, 74, 90, 76, 73, 71]))
+    assert c["verdict"] == "Warmest stretch" and c["accent"] == "orange"
+    assert c["detail"] == "high 90° · cooler around it"
+
+
+def test_trend_card_none_without_full_window():
+    assert advice._trend_card([]) is None
+    assert advice._trend_card(_window([80, 81, 82])) is None
+
+
+def test_trend_card_none_when_window_has_null_temp():
+    window = _window([82, 84, 85, 78, 80, 83, 85])
+    window[1]["hi_f"] = None
+    assert advice._trend_card(window) is None
+
+
+def test_trend_card_dhi_minus3_is_cooler_day():
+    # today (idx 3) = 77, yesterday (idx 2) = 80 -> dhi = -3, not a window extreme
+    s, c = advice._trend_card(_window([78, 79, 80, 77, 76, 78, 79]))
+    assert c["verdict"] == "Cooler day" and c["accent"] == "blue"
+
+
+def test_trend_card_dhi_plus3_is_warmer_day():
+    # today (idx 3) = 80, yesterday (idx 2) = 77 -> dhi = +3, not a window extreme
+    s, c = advice._trend_card(_window([79, 78, 77, 80, 81, 79, 78]))
+    assert c["verdict"] == "Warmer day" and c["accent"] == "orange"
+
+
+def test_trend_card_dhi_minus10_is_much_cooler():
+    # today (idx 3) = 75, yesterday (idx 2) = 85 -> dhi = -10, not a window extreme
+    s, c = advice._trend_card(_window([76, 77, 85, 75, 76, 77, 78]))
+    assert c["verdict"] == "Much cooler" and c["accent"] == "blue"
+
+
+def test_trend_card_dhi_plus10_is_much_warmer():
+    # today (idx 3) = 85, yesterday (idx 2) = 75 -> dhi = +10, not a window extreme
+    s, c = advice._trend_card(_window([76, 77, 75, 85, 84, 83, 82]))
+    assert c["verdict"] == "Much warmer" and c["accent"] == "orange"
+
+
+def test_outlook_warming_trend():
+    s, c = advice._outlook_card(_days([70, 74, 78, 82]))
+    assert s == advice.OUTLOOK_SCORE and c["cat"] == "OUTLOOK"
+    assert c["verdict"] == "Warming trend" and c["accent"] == "orange"
+    assert c["detail"] == "→ 82° by Thu"
+
+
+def test_outlook_cooling_trend():
+    s, c = advice._outlook_card(_days([82, 78, 74, 70]))
+    assert c["verdict"] == "Cooling trend" and c["accent"] == "blue"
+    assert c["detail"] == "→ 70° by Thu"
+
+
+def test_outlook_none_when_change_below_threshold():
+    assert advice._outlook_card(_days([70, 72, 71, 74])) is None   # net +4 < 8
+
+
+def test_outlook_none_when_reversal_dominates():
+    # net +8 but a -6 reversal in the middle: not a consistent direction
+    assert advice._outlook_card(_days([70, 84, 78, 78])) is None
+
+
+def test_outlook_none_without_enough_days():
+    assert advice._outlook_card(_days([70, 74, 80])) is None
+
+
+def test_outlook_net_8_exactly_fires_warming_trend():
+    s, c = advice._outlook_card(_days([70, 72, 74, 78]))
+    assert c["verdict"] == "Warming trend"

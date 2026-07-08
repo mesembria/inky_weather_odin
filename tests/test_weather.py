@@ -282,3 +282,43 @@ def test_parse_sun_labels():
     data = {"daily": {"sunrise": ["2026-07-03T06:12"], "sunset": ["2026-07-03T20:31"]}}
     s = weather.parse_sun(data)
     assert s["sunrise"] == "6a" and s["sunset"] == "8p"
+
+
+def test_parse_trend_daily_returns_seven():
+    data = _load_fixture("openmeteo_trenddaily.json")
+    window = weather.parse_trend_daily(data)
+    assert len(window) == 7
+    assert window[3] == {"hi_f": 78, "lo_f": 58}   # today at index 3
+
+
+def test_parse_trend_daily_rounds_and_skips_short():
+    data = {"daily": {"time": ["2026-07-06", "2026-07-07"],
+                      "temperature_2m_max": [84.6, 78.2],
+                      "temperature_2m_min": [62.4]}}
+    window = weather.parse_trend_daily(data)
+    assert window == [{"hi_f": 85, "lo_f": 62}]     # min length across arrays, rounded
+
+
+def test_parse_trend_daily_empty_on_missing_daily():
+    assert weather.parse_trend_daily({}) == []
+
+
+def test_parse_trend_daily_null_temp_stays_none():
+    data = {"daily": {"time": ["2026-07-06", "2026-07-07", "2026-07-08"],
+                      "temperature_2m_max": [84.6, None, 78.2],
+                      "temperature_2m_min": [62.4, 60.1, 58.3]}}
+    window = weather.parse_trend_daily(data)
+    assert len(window) == 3
+    assert window[1]["hi_f"] is None
+    assert window[0]["hi_f"] == 85 and window[2]["hi_f"] == 78
+
+
+def test_trend_daily_url_has_past_and_forecast_days():
+    url = weather.trend_daily_url(37.2, -80.4)
+    assert "past_days=3" in url and "forecast_days=4" in url
+    assert "temperature_2m_max" in url
+
+
+def test_load_trend_daily_fixture():
+    window = weather.load_trend_daily_fixture(FIXTURE_DIR)
+    assert len(window) == 7 and window[2]["hi_f"] == 85

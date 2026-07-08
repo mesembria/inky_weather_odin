@@ -8,6 +8,13 @@ import math
 
 ICE_TYPES = ("ICE", "SLEET", "FREEZING_RAIN")
 MUGGY_DEWPOINT_F = 60   # daytime dew point at/above this reads as "muggy"
+TREND_HI_FLAT = 2        # |Δhigh| <= this reads as "Steady"
+TREND_HI_BIG = 10        # |Δhigh| >= this reads as "Much warmer/cooler"
+TREND_LOW_DETAIL = 5     # append the low delta when |Δlow| >= this
+TREND_WINDOW_MARGIN = 3  # today must beat its nearest neighbor by this to be a peak/dip
+TREND_SCORE = 65
+OUTLOOK_NET = 8          # min |net high change| over the next 3 days to fire
+OUTLOOK_SCORE = 54       # informational; below TREND
 
 
 def _card(cat, verdict, detail, accent):
@@ -70,9 +77,79 @@ def _w1(hs):
     return hs[-1]["ampm_label"].lower()
 
 
+def _trend_card(window):
+    """Always-on day-over-day TREND card, upgrading to a window peak/dip framing.
+
+    `window` is the 7-day hi/lo list from weather.parse_trend_daily
+    ([t-3..t+3], today at index 3). Single-source (Open-Meteo) so the
+    day-over-day delta carries no cross-model bias. Returns (score, card) or
+    None when the window is not a full 7 days.
+    """
+    if not window or len(window) != 7:
+        return None
+    if any(d["hi_f"] is None or d["lo_f"] is None for d in window):
+        return None
+    today, yest = window[3], window[2]
+    his = [d["hi_f"] for d in window]
+    others = his[:3] + his[4:]
+    # window upgrade: today a strict peak/dip beating its nearest neighbor by margin
+    if today["hi_f"] < min(others) and min(others) - today["hi_f"] >= TREND_WINDOW_MARGIN:
+        return (TREND_SCORE, _card("TREND", "Coolest stretch",
+                                   "high {}° · warmer around it".format(today["hi_f"]), "blue"))
+    if today["hi_f"] > max(others) and today["hi_f"] - max(others) >= TREND_WINDOW_MARGIN:
+        return (TREND_SCORE, _card("TREND", "Warmest stretch",
+                                   "high {}° · cooler around it".format(today["hi_f"]), "orange"))
+    # default: day-over-day on the high
+    dhi = today["hi_f"] - yest["hi_f"]
+    dlo = today["lo_f"] - yest["lo_f"]
+    if dhi <= -TREND_HI_BIG:
+        verdict, accent = "Much cooler", "blue"
+    elif dhi <= -(TREND_HI_FLAT + 1):
+        verdict, accent = "Cooler day", "blue"
+    elif dhi >= TREND_HI_BIG:
+        verdict, accent = "Much warmer", "orange"
+    elif dhi >= TREND_HI_FLAT + 1:
+        verdict, accent = "Warmer day", "orange"
+    else:
+        verdict, accent = "Steady", "gray"
+    if verdict == "Steady":
+        detail = "high {}° · ~ yesterday".format(today["hi_f"])
+    else:
+        detail = "high {}° ({:+d})".format(today["hi_f"], dhi)
+        if abs(dlo) >= TREND_LOW_DETAIL:
+            detail += " · low {}° ({:+d})".format(today["lo_f"], dlo)
+    return (TREND_SCORE, _card("TREND", verdict, detail, accent))
+
+
+def _outlook_card(days):
+    """Forward OUTLOOK card: direction of the next few forecast days.
+
+    `days` is the Google daily forecast (index 0 = today). Fires when the net
+    high change over the next 3 days is at least OUTLOOK_NET and dominates any
+    opposite-direction reversal (net magnitude >= twice the largest reversal).
+    Returns (score, card) or None.
+    """
+    if len(days) < 4:
+        return None
+    his = [days[i]["hi_f"] for i in range(4)]        # today + next 3
+    steps = [his[i + 1] - his[i] for i in range(3)]
+    net = his[3] - his[0]
+    if abs(net) < OUTLOOK_NET:
+        return None
+    reversal = max([0] + [(-s if net > 0 else s) for s in steps])
+    if abs(net) < 2 * reversal:
+        return None
+    end = days[3]
+    if net > 0:
+        return (OUTLOOK_SCORE, _card("OUTLOOK", "Warming trend",
+                                     "→ {}° by {}".format(end["hi_f"], end["name"]), "orange"))
+    return (OUTLOOK_SCORE, _card("OUTLOOK", "Cooling trend",
+                                 "→ {}° by {}".format(end["hi_f"], end["name"]), "blue"))
+
+
 # tie-break precedence for equal scores: lower index = wins
 _PRECEDENCE = ["ICE", "SNOW", "STORMS", "SMOKE", "WIND", "OUTDOORS", "SUN",
-               "TREND", "OVERNIGHT", "SPREAD", "MOON", "DAYLIGHT"]
+               "TREND", "OUTLOOK", "OVERNIGHT", "SPREAD", "MOON", "DAYLIGHT"]
 
 
 def _tiebreak_key(scored):
@@ -128,20 +205,6 @@ def _situational(hours, gust, aqi):
         C.append((60, _card("SUN", "Extreme UV", "Index {} · cover up".format(uvmax), "red")))
     elif day_h and uvmax >= 6:
         C.append((44, _card("SUN", "Strong UV", "Index {} midday · hat+SPF".format(uvmax), "orange")))
-
-    T = [h["temp_f"] for h in hours]
-    half = T[len(T) // 2:]
-    base = len(T) // 2
-    lo_late, hi_late = min(half), max(half)
-    cool_sw, warm_sw = T[0] - lo_late, hi_late - T[0]
-    if warm_sw >= 18 and warm_sw >= cool_sw:
-        j = base + half.index(hi_late)
-        C.append((58, _card("TREND", "Warming up",
-                            "{}°→{}° by {}".format(T[0], hi_late, hours[j]["ampm_label"].lower()), "orange")))
-    elif cool_sw >= 18:
-        j = base + half.index(lo_late)
-        C.append((58, _card("TREND", "Cooling off",
-                            "{}°→{}° by {}".format(T[0], lo_late, hours[j]["ampm_label"].lower()), "blue")))
 
     if night_h:
         nlo = min(h["temp_f"] for h in night_h)
@@ -200,7 +263,7 @@ def _info_tier(hours, bands, sun, date, has_hazard):
     return C
 
 
-def build_cards(hours, bands, gust, aqi, sun, date):
+def build_cards(hours, bands, gust, aqi, sun, date, days=None, trend=None):
     sun = sun or {}
     gmax = max(gust) if gust else 0
     amax = max(aqi) if aqi else 0
@@ -208,6 +271,14 @@ def build_cards(hours, bands, gust, aqi, sun, date):
     scored = _situational(hours, gmax, amax)
     has_hazard = any(s >= 50 for s, _ in scored)
     scored += _info_tier(hours, bands, sun, date, has_hazard)
+    if trend:
+        t = _trend_card(trend)
+        if t:
+            scored.append(t)
+    if days:
+        o = _outlook_card(days)
+        if o:
+            scored.append(o)
     scored.sort(key=_tiebreak_key)
     cards += [c for _, c in scored[:2]]
     return cards

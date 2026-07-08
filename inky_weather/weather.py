@@ -363,3 +363,38 @@ def fetch_dewpoint(lat, long, first_hour, count=12, timeout=20):
 def load_dewpoint_fixture(fixture_dir, first_hour, count=12):
     with open(os.path.join(fixture_dir, "openmeteo_dewpoint.json")) as f:
         return parse_dewpoint(json.load(f), first_hour, count)
+
+
+def parse_trend_daily(data):
+    """Daily hi/lo window from an Open-Meteo daily response.
+
+    Returns a list of {"hi_f": int, "lo_f": int}, chronological. With
+    past_days=3 & forecast_days=4 that is [t-3, t-2, t-1, today, t+1, t+2, t+3]
+    with today at index 3. Truncates to the shortest of the parallel arrays.
+    """
+    daily = data.get("daily", {})
+    times = daily.get("time", [])
+    his = daily.get("temperature_2m_max", [])
+    los = daily.get("temperature_2m_min", [])
+    n = min(len(times), len(his), len(los))
+    return [{"hi_f": round(his[i]) if his[i] is not None else None,
+              "lo_f": round(los[i]) if los[i] is not None else None} for i in range(n)]
+
+
+def trend_daily_url(lat, long):
+    params = {"latitude": lat, "longitude": long,
+              "daily": "temperature_2m_max,temperature_2m_min",
+              "temperature_unit": "fahrenheit", "timezone": "auto",
+              "past_days": 3, "forecast_days": 4}
+    return "{}?{}".format(_FORECAST_ENDPOINT, urlencode(params))
+
+
+def fetch_trend_daily(lat, long, timeout=20):
+    resp = requests.get(trend_daily_url(lat, long), timeout=timeout)
+    resp.raise_for_status()
+    return parse_trend_daily(resp.json())
+
+
+def load_trend_daily_fixture(fixture_dir):
+    with open(os.path.join(fixture_dir, "openmeteo_trenddaily.json")) as f:
+        return parse_trend_daily(json.load(f))
