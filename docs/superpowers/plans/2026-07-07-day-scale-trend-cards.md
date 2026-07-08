@@ -1,5 +1,19 @@
 # Day-scale Trend Cards Implementation Plan
 
+> **⚠️ Superseded in part (2026-07-08).** This plan was executed as written, but a
+> follow-up fix changed the backward trend's **data source** after live testing.
+> The Open-Meteo `past_days` approach below (Task 1, and the `trend`/window pieces of
+> Tasks 2/4/5) was replaced by **persisted Google daily highs** (`inky_weather/history.py`):
+> the card now compares Google-today vs a locally-saved Google-yesterday, because raw
+> Open-Meteo runs mean-biased vs the Google-anchored display and produced a card that
+> contradicted the rest of the screen. `_trend_card`'s signature changed from
+> `_trend_card(window)` to `_trend_card(today, yesterday, stretch_his)`, and the
+> `trend` argument to `build_cards` is now a `{"today","yesterday","stretch_his"}`
+> dict. `_outlook_card`, `_PRECEDENCE`, the intraday-swing removal, scores, and the
+> banner layout are unchanged. See the revised **design spec** (`../specs/2026-07-07-day-scale-trend-cards-design.md`,
+> "Data sourcing") for the shipped design. The task steps below are retained as the
+> historical execution record.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the intraday-swing TREND card with day-scale trend cards: an always-on day-over-day comparison (upgrading to a window peak/dip framing) plus an independent forward OUTLOOK card.

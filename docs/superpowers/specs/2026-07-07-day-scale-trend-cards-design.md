@@ -1,7 +1,10 @@
 # Day-scale trend cards — design
 
 **Date:** 2026-07-07
-**Status:** Approved, ready for planning
+**Status:** Implemented. **Revised 2026-07-08** — backward data source changed from
+Open-Meteo `past_days` to **persisted Google daily highs** after live testing showed
+Open-Meteo disagrees with the Google-anchored display (see "Data sourcing"). Sections
+below reflect the shipped design.
 
 ## Problem
 
@@ -26,29 +29,38 @@ Replace the single intraday-swing card with day-scale trend signals:
 
 - No new display layout. The banner remains exactly 3 card slots
   (`render.py:107`), slot 1 always DRESS.
-- No local persistence / saved state. Past data comes from the API.
 - Overnight-low framing stays owned by the existing `OVERNIGHT` card; trend cards
   headline on the daytime **high** (low only as a detail).
 
 ## Data sourcing
 
-Backward-looking data comes from **Open-Meteo `past_days`**, not Google. Rationale:
-Google's history endpoint (`history/hours:lookup`) returns only the last **24
-hours** of hourly data — enough for a rough yesterday but not a clean calendar-day
-high/low, and nothing for a multi-day window. Open-Meteo's daily endpoint returns
-full calendar days for as many past days as requested, and the project already
-talks to Open-Meteo for ensemble / dew-point / AQI.
+**All trend temperatures come from Google**, the deterministic source the rest of
+the display trusts. This is the core constraint, learned from live testing: the
+first cut sourced the backward data from **Open-Meteo `past_days`**, but Open-Meteo
+runs mean-biased vs Google (the codebase already compensates for this in
+`recenter_bands`, which re-anchors the Open-Meteo ensemble onto Google temps). The
+result was a card that read "Steady · high 94°" while the same screen showed Google's
+88° and the day-over-day delta tracked Open-Meteo's model instead of the trusted
+forecast. Mixing sources in the delta is also unsafe — a systematic Google-vs-Open-
+Meteo offset would skew every day's delta. So the trend compares **Google-to-Google**.
 
-- **`weather.py`** — new `fetch_past_daily(lat, long, ...)` (+ a fixture loader
-  mirroring the existing `load_*_fixture` helpers) calling Open-Meteo's daily
-  endpoint with `daily=temperature_2m_max,temperature_2m_min&past_days=3&forecast_days=1`.
-  Returns highs/lows for `[t-3, t-2, t-1, today]` (today = the actual-so-far day).
-- **`main.py`** — orchestrate the fetch with the same graceful-degradation pattern
-  as ensemble/AQI/sun. If the past-data fetch fails or returns nothing, the
-  backward `TREND` card cannot compute and is simply not emitted; the forward
-  `OUTLOOK` card (Google-only) is unaffected.
-- **Forward data** — the existing Google 10-day daily forecast (`days`, already
-  fetched) supplies both the forward half of the window and the `OUTLOOK` card.
+Google's forecast is forward-only (today + 9 days), so "yesterday" must be
+remembered from a previous run:
+
+- **`history.py`** (new) — persists each run's Google daily high/low to a small
+  git-ignored JSON file (`load_history`, `record_day`, pruned to ~10 days), and
+  assembles the card's inputs (`trend_input(days, history, date)`): today's Google
+  high/low (`days[0]`), yesterday's persisted high/low (or `None` if not yet
+  recorded), and the surrounding-stretch highs (up to 3 persisted past days + the
+  next 3 Google forecast days, excluding today).
+- **`main.py`** — loads history, builds the trend input, records today's Google
+  high/low for tomorrow. History reads/writes are best-effort (`_safe` / swallowed
+  write errors) so storage problems never break the render.
+- **Consequence:** day-over-day needs one prior run to exist, so the card begins on
+  **day two**; the window peak/dip engages as history accrues. This first-run gap is
+  the accepted cost of staying bias-free and display-consistent.
+- **Forward data** — the existing Google 10-day daily forecast (`days`) supplies the
+  forward stretch highs and the `OUTLOOK` card.
 
 ## Card logic
 
@@ -57,12 +69,13 @@ All thresholds below are defaults and tunable.
 ### Backward: always-on singular `TREND` card
 
 One `TREND` card is generated per run (data permitting). Its default message is the
-day-over-day comparison; when today is a genuine peak/dip of the straddling window,
+day-over-day comparison; when today is a genuine peak/dip of the surrounding stretch,
 the message upgrades to the window framing instead. This is how day-over-day and
 window position stay mutually exclusive — same slot, one wins.
 
-**Day-over-day (default message).** Compare today's forecast high to yesterday's
-actual high (`yesterday` = `past[-2]` from the Open-Meteo array; `today` = `past[-1]`):
+**Day-over-day (default message).** Compare today's Google forecast high to
+yesterday's persisted Google high (`today` = `days[0]`; `yesterday` from
+`history.py`). Needs a recorded yesterday, so it is silent on the first run:
 
 | Δhigh (today − yesterday) | Verdict | Detail | Accent |
 |---|---|---|---|
@@ -74,13 +87,18 @@ actual high (`yesterday` = `past[-2]` from the Open-Meteo array; `today` = `past
 
 - Append `· low 51° (−4)` to the detail when `|Δlow| ≥ 5°`.
 
-**Window upgrade (either/or).** Window = 3 past highs + today + 3 forward highs
-(7 highs; forward half from the Google `days` forecast). When today's high is the
-strict min or max of the window by `≥ 3°` over its nearest neighbor, replace the
+**Window upgrade (either/or).** The surrounding stretch = up to 3 persisted past
+highs + up to 3 forward Google-forecast highs (today excluded). The upgrade only
+engages when the stretch has **≥ 4** days — so a pure-forecast run (forward-only,
+before history builds) can't masquerade as a "stretch" that overlaps `OUTLOOK`.
+When today's high is the strict min or max of the stretch by `≥ 3°`, replace the
 message:
 
 - min → **"Coolest stretch"** · `high 62° · warmer around it` (blue)
 - max → **"Warmest stretch"** · `high 88° · cooler around it` (orange)
+
+The upgrade can fire even before a "yesterday" is recorded, since it needs only the
+stretch, not the day-over-day delta.
 
 **Score ≈ 65.** High enough to outrank minor info (overnight-mild, UV, moon,
 daylight) and to survive alongside a single hazard, but genuine danger (ice 97,
@@ -111,12 +129,16 @@ The intraday-swing block (`advice.py:132-144`) is deleted outright.
 
 ## Testing (TDD)
 
-- Unit tests per generator over synthetic high/low arrays:
+- Unit tests per generator over synthetic today/yesterday/stretch inputs:
   - day-over-day: fires with correct verdict/accent at each threshold boundary,
-    including the flat "Steady" case and the low-detail append.
-  - window upgrade: fires only when today is a strict peak/dip by the margin;
-    day-over-day is used otherwise (either/or precedence).
+    including the flat "Steady" case, the low-detail append, and the first-run
+    (no yesterday) → no card.
+  - window upgrade: fires only when today is a strict peak/dip by the margin AND
+    the stretch has ≥ 4 days; can fire without a yesterday; day-over-day is used
+    otherwise (either/or precedence).
   - `OUTLOOK`: direction detection, net-change threshold, no-fire on flat/noisy.
-- An Open-Meteo past-data fixture wired into the existing offline end-to-end render
-  test, plus a degradation case (missing past data → no backward `TREND`, render
-  still succeeds).
+- `history.py` tests: `load_history` on a missing file → `{}`; `record_day`
+  round-trips and prunes to `keep`; write errors are swallowed; `trend_input`
+  assembles today/yesterday/stretch and yields no yesterday when history is empty.
+- Fixture end-to-end render still succeeds (fixture mode synthesizes a warmer
+  "yesterday" so the demo shows a "Cooler day" card).

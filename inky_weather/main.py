@@ -4,7 +4,7 @@ import datetime
 import os
 import sys
 
-from . import weather, icons, render, advice
+from . import weather, icons, render, advice, history
 
 FIXTURE_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 ICON_CACHE = os.path.join(os.path.dirname(__file__), "assets", "icons")
@@ -33,14 +33,19 @@ def _icons_for(items, size):
 
 
 def build_image(use_fixture, cfg):
+    now = datetime.datetime.now()
     if use_fixture:
         hours, days = weather.load_from_fixtures(FIXTURE_DIR)
         fh = hours[0]["hour"]
         bands, gust = weather.load_ensemble_fixture(FIXTURE_DIR, fh)
         aqi = weather.load_airquality_fixture(FIXTURE_DIR, fh)
         dew = weather.load_dewpoint_fixture(FIXTURE_DIR, fh)
-        trend = weather.load_trend_daily_fixture(FIXTURE_DIR)
         sun = {"sunset": "8p", "sunrise": "6a"}
+        # No persisted history offline — synthesize a warmer "yesterday" so the
+        # demo/preview shows a representative "Cooler day" trend card.
+        trend = {"today": {"hi_f": days[0]["hi_f"], "lo_f": days[0]["lo_f"]},
+                 "yesterday": {"hi_f": days[0]["hi_f"] + 6, "lo_f": days[0]["lo_f"] + 4},
+                 "stretch_his": [d["hi_f"] for d in days[1:4]]}
     else:
         hours, days = weather.fetch_live(cfg["lat"], cfg["long"], cfg["google_weather_key"])
         fh = hours[0]["hour"]
@@ -50,7 +55,11 @@ def build_image(use_fixture, cfg):
         aqi = _safe(lambda: weather.fetch_air_quality(cfg["lat"], cfg["long"], fh), default=[])
         sun = _safe(lambda: weather.fetch_sun(cfg["lat"], cfg["long"]), default={})
         dew = _safe(lambda: weather.fetch_dewpoint(cfg["lat"], cfg["long"], fh), default=[])
-        trend = _safe(lambda: weather.fetch_trend_daily(cfg["lat"], cfg["long"]), default=[])
+        # Trend compares Google-to-Google from persisted daily highs (the display's
+        # trusted source), then records today's high for tomorrow's comparison.
+        hist = _safe(history.load_history, default={})
+        trend = history.trend_input(days, hist, now.date())
+        _safe(lambda: history.record_day(now.date(), days[0]["hi_f"], days[0]["lo_f"]))
 
     # Anchor the ensemble spread on the trusted (Google) temps so the line always
     # sits inside its band (the two are different models — keep spread, drop bias).
@@ -62,7 +71,6 @@ def build_image(use_fixture, cfg):
             h["dew_f"] = dew[i]
 
     hour_icons = _icons_for(hours, render.ICON_SZ_HOUR)
-    now = datetime.datetime.now()
     cards = advice.build_cards(hours, bands, gust, aqi, sun, now.date(), days=days, trend=trend)
     badge = advice.confidence(bands)
     return render.render_display(
