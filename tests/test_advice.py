@@ -87,6 +87,37 @@ def test_build_cards_hazards_beat_info_tier():
     assert not any(c["cat"] in ("MOON", "DAYLIGHT") for c in cards)  # crowded out
 
 
+def test_build_cards_includes_trend():
+    hrs = _hours([60, 63, 66, 68, 70, 71, 71, 70, 68, 66, 64, 62])
+    cards = advice.build_cards(hrs, [], [], [], {"sunset": "8p"},
+                               datetime.date(2026, 7, 15),
+                               trend=_window([82, 84, 85, 78, 80, 83, 85]))
+    assert any(c["cat"] == "TREND" and c["verdict"] == "Cooler day" for c in cards)
+
+
+def test_build_cards_hazard_can_bump_trend():
+    # multiple hazards (storm + gusty wind) fill both non-DRESS slots ahead of TREND
+    hrs = _hours([78] * 12, thunder=65, pop=90)   # STORMS=90, OUTDOORS(rain)=72
+    cards = advice.build_cards(hrs, [], [40] * 12, [], {}, datetime.date(2026, 7, 15),
+                               trend=_window([82, 84, 85, 78, 80, 83, 85]))
+    assert any(c["cat"] == "STORMS" for c in cards)
+    assert not any(c["cat"] == "TREND" for c in cards)
+
+
+def test_build_cards_trend_absent_without_data():
+    hrs = _hours([60, 63, 66, 68, 70, 71, 71, 70, 68, 66, 64, 62])
+    cards = advice.build_cards(hrs, [], [], [], {"sunset": "8p"},
+                               datetime.date(2026, 7, 15), trend=[])
+    assert not any(c["cat"] == "TREND" for c in cards)
+
+
+def test_build_cards_includes_outlook():
+    hrs = _hours([60, 63, 66, 68, 70, 71, 71, 70, 68, 66, 64, 62])
+    cards = advice.build_cards(hrs, [], [], [], {}, datetime.date(2026, 7, 15),
+                               days=_days([70, 74, 78, 82]))
+    assert any(c["cat"] == "OUTLOOK" for c in cards)
+
+
 def _window(highs, lows=None):
     lows = lows or [h - 20 for h in highs]
     return [{"hi_f": h, "lo_f": l} for h, l in zip(highs, lows)]

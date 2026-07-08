@@ -147,7 +147,7 @@ def _outlook_card(days):
 
 # tie-break precedence for equal scores: lower index = wins
 _PRECEDENCE = ["ICE", "SNOW", "STORMS", "SMOKE", "WIND", "OUTDOORS", "SUN",
-               "TREND", "OVERNIGHT", "SPREAD", "MOON", "DAYLIGHT"]
+               "TREND", "OUTLOOK", "OVERNIGHT", "SPREAD", "MOON", "DAYLIGHT"]
 
 
 def _tiebreak_key(scored):
@@ -203,20 +203,6 @@ def _situational(hours, gust, aqi):
         C.append((60, _card("SUN", "Extreme UV", "Index {} · cover up".format(uvmax), "red")))
     elif day_h and uvmax >= 6:
         C.append((44, _card("SUN", "Strong UV", "Index {} midday · hat+SPF".format(uvmax), "orange")))
-
-    T = [h["temp_f"] for h in hours]
-    half = T[len(T) // 2:]
-    base = len(T) // 2
-    lo_late, hi_late = min(half), max(half)
-    cool_sw, warm_sw = T[0] - lo_late, hi_late - T[0]
-    if warm_sw >= 18 and warm_sw >= cool_sw:
-        j = base + half.index(hi_late)
-        C.append((58, _card("TREND", "Warming up",
-                            "{}°→{}° by {}".format(T[0], hi_late, hours[j]["ampm_label"].lower()), "orange")))
-    elif cool_sw >= 18:
-        j = base + half.index(lo_late)
-        C.append((58, _card("TREND", "Cooling off",
-                            "{}°→{}° by {}".format(T[0], lo_late, hours[j]["ampm_label"].lower()), "blue")))
 
     if night_h:
         nlo = min(h["temp_f"] for h in night_h)
@@ -275,7 +261,7 @@ def _info_tier(hours, bands, sun, date, has_hazard):
     return C
 
 
-def build_cards(hours, bands, gust, aqi, sun, date):
+def build_cards(hours, bands, gust, aqi, sun, date, days=None, trend=None):
     sun = sun or {}
     gmax = max(gust) if gust else 0
     amax = max(aqi) if aqi else 0
@@ -283,6 +269,14 @@ def build_cards(hours, bands, gust, aqi, sun, date):
     scored = _situational(hours, gmax, amax)
     has_hazard = any(s >= 50 for s, _ in scored)
     scored += _info_tier(hours, bands, sun, date, has_hazard)
+    if trend:
+        t = _trend_card(trend)
+        if t:
+            scored.append(t)
+    if days:
+        o = _outlook_card(days)
+        if o:
+            scored.append(o)
     scored.sort(key=_tiebreak_key)
     cards += [c for _, c in scored[:2]]
     return cards
