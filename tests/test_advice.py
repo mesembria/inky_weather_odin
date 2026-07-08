@@ -85,3 +85,52 @@ def test_build_cards_hazards_beat_info_tier():
     assert cards[0]["cat"] == "DRESS"
     assert any(c["cat"] == "STORMS" for c in cards)
     assert not any(c["cat"] in ("MOON", "DAYLIGHT") for c in cards)  # crowded out
+
+
+def _window(highs, lows=None):
+    lows = lows or [h - 20 for h in highs]
+    return [{"hi_f": h, "lo_f": l} for h, l in zip(highs, lows)]
+
+
+def test_trend_card_cooler_day():
+    # today (idx 3) 7 cooler than yesterday, not a window extreme
+    s, c = advice._trend_card(_window([82, 84, 85, 78, 80, 83, 85]))
+    assert s == advice.TREND_SCORE and c["cat"] == "TREND"
+    assert c["verdict"] == "Cooler day" and c["accent"] == "blue"
+    assert c["detail"] == "high 78° (-7)"
+
+
+def test_trend_card_appends_low_when_it_moves():
+    s, c = advice._trend_card(_window([82, 84, 85, 78, 80, 83, 85],
+                                      [60, 62, 63, 58, 59, 61, 62]))
+    assert c["detail"] == "high 78° (-7) · low 58° (-5)"
+
+
+def test_trend_card_steady_when_flat():
+    s, c = advice._trend_card(_window([80, 81, 79, 80, 81, 80, 79]))
+    assert c["verdict"] == "Steady" and c["accent"] == "gray"
+    assert c["detail"] == "high 80° · ~ yesterday"
+
+
+def test_trend_card_much_warmer():
+    s, c = advice._trend_card(_window([60, 62, 64, 76, 74, 72, 70]))
+    assert c["verdict"] == "Much warmer" and c["accent"] == "orange"
+    assert c["detail"] == "high 76° (+12)"
+
+
+def test_trend_card_coolest_stretch_upgrade():
+    # today strictly the lowest high, beats nearest neighbor by >= 3
+    s, c = advice._trend_card(_window([84, 85, 86, 70, 80, 83, 85]))
+    assert c["verdict"] == "Coolest stretch" and c["accent"] == "blue"
+    assert c["detail"] == "high 70° · warmer around it"
+
+
+def test_trend_card_warmest_stretch_upgrade():
+    s, c = advice._trend_card(_window([70, 72, 74, 90, 76, 73, 71]))
+    assert c["verdict"] == "Warmest stretch" and c["accent"] == "orange"
+    assert c["detail"] == "high 90° · cooler around it"
+
+
+def test_trend_card_none_without_full_window():
+    assert advice._trend_card([]) is None
+    assert advice._trend_card(_window([80, 81, 82])) is None

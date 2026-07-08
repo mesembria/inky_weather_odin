@@ -8,6 +8,11 @@ import math
 
 ICE_TYPES = ("ICE", "SLEET", "FREEZING_RAIN")
 MUGGY_DEWPOINT_F = 60   # daytime dew point at/above this reads as "muggy"
+TREND_HI_FLAT = 2        # |Δhigh| <= this reads as "Steady"
+TREND_HI_BIG = 10        # |Δhigh| >= this reads as "Much warmer/cooler"
+TREND_LOW_DETAIL = 5     # append the low delta when |Δlow| >= this
+TREND_WINDOW_MARGIN = 3  # today must beat its nearest neighbor by this to be a peak/dip
+TREND_SCORE = 65
 
 
 def _card(cat, verdict, detail, accent):
@@ -68,6 +73,48 @@ def _w0(hs):
 
 def _w1(hs):
     return hs[-1]["ampm_label"].lower()
+
+
+def _trend_card(window):
+    """Always-on day-over-day TREND card, upgrading to a window peak/dip framing.
+
+    `window` is the 7-day hi/lo list from weather.parse_trend_daily
+    ([t-3..t+3], today at index 3). Single-source (Open-Meteo) so the
+    day-over-day delta carries no cross-model bias. Returns (score, card) or
+    None when the window is not a full 7 days.
+    """
+    if not window or len(window) != 7:
+        return None
+    today, yest = window[3], window[2]
+    his = [d["hi_f"] for d in window]
+    others = his[:3] + his[4:]
+    # window upgrade: today a strict peak/dip beating its nearest neighbor by margin
+    if today["hi_f"] < min(others) and min(others) - today["hi_f"] >= TREND_WINDOW_MARGIN:
+        return (TREND_SCORE, _card("TREND", "Coolest stretch",
+                                   "high {}° · warmer around it".format(today["hi_f"]), "blue"))
+    if today["hi_f"] > max(others) and today["hi_f"] - max(others) >= TREND_WINDOW_MARGIN:
+        return (TREND_SCORE, _card("TREND", "Warmest stretch",
+                                   "high {}° · cooler around it".format(today["hi_f"]), "orange"))
+    # default: day-over-day on the high
+    dhi = today["hi_f"] - yest["hi_f"]
+    dlo = today["lo_f"] - yest["lo_f"]
+    if dhi <= -TREND_HI_BIG:
+        verdict, accent = "Much cooler", "blue"
+    elif dhi <= -(TREND_HI_FLAT + 1):
+        verdict, accent = "Cooler day", "blue"
+    elif dhi >= TREND_HI_BIG:
+        verdict, accent = "Much warmer", "orange"
+    elif dhi >= TREND_HI_FLAT + 1:
+        verdict, accent = "Warmer day", "orange"
+    else:
+        verdict, accent = "Steady", "gray"
+    if verdict == "Steady":
+        detail = "high {}° · ~ yesterday".format(today["hi_f"])
+    else:
+        detail = "high {}° ({:+d})".format(today["hi_f"], dhi)
+        if abs(dlo) >= TREND_LOW_DETAIL and dlo != dhi:
+            detail += " · low {}° ({:+d})".format(today["lo_f"], dlo)
+    return (TREND_SCORE, _card("TREND", verdict, detail, accent))
 
 
 # tie-break precedence for equal scores: lower index = wins
