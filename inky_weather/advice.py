@@ -112,7 +112,7 @@ def _trend_card(window):
         detail = "high {}° · ~ yesterday".format(today["hi_f"])
     else:
         detail = "high {}° ({:+d})".format(today["hi_f"], dhi)
-        if abs(dlo) >= TREND_LOW_DETAIL and dlo != dhi:
+        if abs(dlo) >= TREND_LOW_DETAIL:
             detail += " · low {}° ({:+d})".format(today["lo_f"], dlo)
     return (TREND_SCORE, _card("TREND", verdict, detail, accent))
 
