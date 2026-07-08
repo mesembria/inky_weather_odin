@@ -13,6 +13,8 @@ TREND_HI_BIG = 10        # |Δhigh| >= this reads as "Much warmer/cooler"
 TREND_LOW_DETAIL = 5     # append the low delta when |Δlow| >= this
 TREND_WINDOW_MARGIN = 3  # today must beat its nearest neighbor by this to be a peak/dip
 TREND_SCORE = 65
+OUTLOOK_NET = 8          # min |net high change| over the next 3 days to fire
+OUTLOOK_SCORE = 54       # informational; below TREND
 
 
 def _card(cat, verdict, detail, accent):
@@ -115,6 +117,32 @@ def _trend_card(window):
         if abs(dlo) >= TREND_LOW_DETAIL:
             detail += " · low {}° ({:+d})".format(today["lo_f"], dlo)
     return (TREND_SCORE, _card("TREND", verdict, detail, accent))
+
+
+def _outlook_card(days):
+    """Forward OUTLOOK card: direction of the next few forecast days.
+
+    `days` is the Google daily forecast (index 0 = today). Fires when the net
+    high change over the next 3 days is at least OUTLOOK_NET and dominates any
+    opposite-direction reversal (net magnitude >= twice the largest reversal).
+    Returns (score, card) or None.
+    """
+    if not days or len(days) < 4:
+        return None
+    his = [days[i]["hi_f"] for i in range(4)]        # today + next 3
+    steps = [his[i + 1] - his[i] for i in range(3)]
+    net = his[3] - his[0]
+    if abs(net) < OUTLOOK_NET:
+        return None
+    reversal = max([0] + [(-s if net > 0 else s) for s in steps])
+    if abs(net) < 2 * reversal:
+        return None
+    end = days[3]
+    if net > 0:
+        return (OUTLOOK_SCORE, _card("OUTLOOK", "Warming trend",
+                                     "→ {}° by {}".format(end["hi_f"], end["name"]), "orange"))
+    return (OUTLOOK_SCORE, _card("OUTLOOK", "Cooling trend",
+                                 "→ {}° by {}".format(end["hi_f"], end["name"]), "blue"))
 
 
 # tie-break precedence for equal scores: lower index = wins
