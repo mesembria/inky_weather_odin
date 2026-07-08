@@ -172,6 +172,36 @@ def test_trend_card_none_without_full_window():
     assert advice._trend_card(_window([80, 81, 82])) is None
 
 
+def test_trend_card_none_when_window_has_null_temp():
+    window = _window([82, 84, 85, 78, 80, 83, 85])
+    window[1]["hi_f"] = None
+    assert advice._trend_card(window) is None
+
+
+def test_trend_card_dhi_minus3_is_cooler_day():
+    # today (idx 3) = 77, yesterday (idx 2) = 80 -> dhi = -3, not a window extreme
+    s, c = advice._trend_card(_window([78, 79, 80, 77, 76, 78, 79]))
+    assert c["verdict"] == "Cooler day" and c["accent"] == "blue"
+
+
+def test_trend_card_dhi_plus3_is_warmer_day():
+    # today (idx 3) = 80, yesterday (idx 2) = 77 -> dhi = +3, not a window extreme
+    s, c = advice._trend_card(_window([79, 78, 77, 80, 81, 79, 78]))
+    assert c["verdict"] == "Warmer day" and c["accent"] == "orange"
+
+
+def test_trend_card_dhi_minus10_is_much_cooler():
+    # today (idx 3) = 75, yesterday (idx 2) = 85 -> dhi = -10, not a window extreme
+    s, c = advice._trend_card(_window([76, 77, 85, 75, 76, 77, 78]))
+    assert c["verdict"] == "Much cooler" and c["accent"] == "blue"
+
+
+def test_trend_card_dhi_plus10_is_much_warmer():
+    # today (idx 3) = 85, yesterday (idx 2) = 75 -> dhi = +10, not a window extreme
+    s, c = advice._trend_card(_window([76, 77, 75, 85, 84, 83, 82]))
+    assert c["verdict"] == "Much warmer" and c["accent"] == "orange"
+
+
 def test_outlook_warming_trend():
     s, c = advice._outlook_card(_days([70, 74, 78, 82]))
     assert s == advice.OUTLOOK_SCORE and c["cat"] == "OUTLOOK"
@@ -196,3 +226,8 @@ def test_outlook_none_when_reversal_dominates():
 
 def test_outlook_none_without_enough_days():
     assert advice._outlook_card(_days([70, 74, 80])) is None
+
+
+def test_outlook_net_8_exactly_fires_warming_trend():
+    s, c = advice._outlook_card(_days([70, 72, 74, 78]))
+    assert c["verdict"] == "Warming trend"

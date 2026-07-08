@@ -87,6 +87,8 @@ def _trend_card(window):
     """
     if not window or len(window) != 7:
         return None
+    if any(d["hi_f"] is None or d["lo_f"] is None for d in window):
+        return None
     today, yest = window[3], window[2]
     his = [d["hi_f"] for d in window]
     others = his[:3] + his[4:]
@@ -127,7 +129,7 @@ def _outlook_card(days):
     opposite-direction reversal (net magnitude >= twice the largest reversal).
     Returns (score, card) or None.
     """
-    if not days or len(days) < 4:
+    if len(days) < 4:
         return None
     his = [days[i]["hi_f"] for i in range(4)]        # today + next 3
     steps = [his[i + 1] - his[i] for i in range(3)]

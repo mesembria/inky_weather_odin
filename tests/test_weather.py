@@ -303,6 +303,16 @@ def test_parse_trend_daily_empty_on_missing_daily():
     assert weather.parse_trend_daily({}) == []
 
 
+def test_parse_trend_daily_null_temp_stays_none():
+    data = {"daily": {"time": ["2026-07-06", "2026-07-07", "2026-07-08"],
+                      "temperature_2m_max": [84.6, None, 78.2],
+                      "temperature_2m_min": [62.4, 60.1, 58.3]}}
+    window = weather.parse_trend_daily(data)
+    assert len(window) == 3
+    assert window[1]["hi_f"] is None
+    assert window[0]["hi_f"] == 85 and window[2]["hi_f"] == 78
+
+
 def test_trend_daily_url_has_past_and_forecast_days():
     url = weather.trend_daily_url(37.2, -80.4)
     assert "past_days=3" in url and "forecast_days=4" in url

@@ -377,7 +377,8 @@ def parse_trend_daily(data):
     his = daily.get("temperature_2m_max", [])
     los = daily.get("temperature_2m_min", [])
     n = min(len(times), len(his), len(los))
-    return [{"hi_f": round(his[i]), "lo_f": round(los[i])} for i in range(n)]
+    return [{"hi_f": round(his[i]) if his[i] is not None else None,
+              "lo_f": round(los[i]) if los[i] is not None else None} for i in range(n)]
 
 
 def trend_daily_url(lat, long):
