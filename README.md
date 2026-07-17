@@ -12,12 +12,23 @@ and US Air Quality Index from Open-Meteo (no API key required). Refreshes hourly
 
 ## Setup (on the Pi)
 1. Enable SPI and I2C: `sudo raspi-config` → Interface Options.
-2. Clone the repo and create a virtualenv:
+2. Free the SPI chip-select pin for the Inky library. On current Raspberry Pi OS
+   (Bookworm), the kernel SPI driver claims GPIO8, and the `inky` library fails
+   with `Chip Select: (line 8, GPIO8) currently claimed by spi0 CS0`. Add the
+   `spi0-0cs` overlay (enables SPI0 with no kernel-managed chip-select lines) to
+   `/boot/firmware/config.txt` (older images: `/boot/config.txt`), right after the
+   existing `dtparam=spi=on` line — keep both:
+   ```
+   dtparam=spi=on
+   dtoverlay=spi0-0cs
+   ```
+   Then `sudo reboot`.
+3. Clone the repo and create a virtualenv:
    ```bash
    python3 -m venv .venv && source .venv/bin/activate
    pip install -r requirements.txt
    ```
-3. Configure:
+4. Configure:
    ```bash
    cp inky_weather/config.example.py inky_weather/config.py
    # edit config.py: google_weather_key, lat, long, location_name
