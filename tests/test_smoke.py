@@ -36,15 +36,19 @@ def test_fixture_synthesizes_cooler_day_trend():
     assert result[1]["cat"] == "TREND" and result[1]["verdict"] == "Cooler day"
 
 
-def test_trend_absent_on_first_run():
-    # no persisted history yet -> trend_input yields no yesterday -> no TREND card
+def test_trend_first_run_forward_uses_tomorrow():
+    # No persisted history yet. The fixture window's high is already behind, so the
+    # trend pivots to tomorrow-vs-today — available from the forecast alone.
     import datetime
     from inky_weather import weather, advice, main, history
     hours, days = weather.load_from_fixtures(main.FIXTURE_DIR)
     trend = history.trend_input(days, {}, datetime.date(2026, 7, 7))
-    cards = advice.build_cards(hours, [], [], [], {}, datetime.date(2026, 7, 7),
-                               days=days, trend=trend)
-    assert not any(c["cat"] == "TREND" for c in cards)
+    forward = advice._today_high_passed(hours, trend["today"]["hi_f"])
+    assert forward is True
+    card = advice._trend_card(trend["today"], trend["yesterday"], trend["stretch_his"],
+                              tomorrow=trend["tomorrow"], forward=forward)
+    assert card is not None
+    assert "tomorrow" in card[1]["detail"]
 
 
 def test_precip_gridlines_and_caption_only_when_wet():

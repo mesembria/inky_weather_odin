@@ -48,9 +48,11 @@ def trend_input(days, history, date):
     """Assemble the trend card's inputs from Google `days` + persisted `history`.
 
     `days` is the Google daily forecast (index 0 = today). Returns a dict
-    {"today", "yesterday", "stretch_his"} or None when there is no forecast:
+    {"today", "yesterday", "tomorrow", "stretch_his"} or None when there is no
+    forecast:
       - today:      {"hi_f","lo_f"} from the forecast (always present).
       - yesterday:  {"hi_f","lo_f"} recorded for date-1, or None (no history yet).
+      - tomorrow:   {"hi_f","lo_f"} from days[1], or None (single-day forecast).
       - stretch_his: highs of the surrounding days (up to 3 persisted past days +
                      the next 3 forecast days), EXCLUDING today; used only for the
                      peak/dip upgrade.
@@ -58,6 +60,8 @@ def trend_input(days, history, date):
     if not days:
         return None
     today = {"hi_f": days[0]["hi_f"], "lo_f": days[0]["lo_f"]}
+    tomorrow = ({"hi_f": days[1]["hi_f"], "lo_f": days[1].get("lo_f")}
+                if len(days) >= 2 else None)
     yesterday = history.get((date - datetime.timedelta(days=1)).isoformat())
     past = []
     for back in (3, 2, 1):
@@ -65,4 +69,5 @@ def trend_input(days, history, date):
         if entry:
             past.append(entry["hi_f"])
     forward = [d["hi_f"] for d in days[1:4]]
-    return {"today": today, "yesterday": yesterday, "stretch_his": past + forward}
+    return {"today": today, "yesterday": yesterday, "tomorrow": tomorrow,
+            "stretch_his": past + forward}
