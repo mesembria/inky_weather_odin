@@ -45,3 +45,34 @@ def test_trend_absent_on_first_run():
     cards = advice.build_cards(hours, [], [], [], {}, datetime.date(2026, 7, 7),
                                days=days, trend=trend)
     assert not any(c["cat"] == "TREND" for c in cards)
+
+
+def test_precip_gridlines_and_caption_only_when_wet():
+    from PIL import Image, ImageDraw
+    from inky_weather import render
+
+    W, H = render.WIDTH, render.HEIGHT
+    axis_y = render.GRAPH_Y + render.GRAPH_H - 16   # matches draw_graph's axis_y
+
+    def render_strip(pop):
+        img = Image.new("RGB", (W, H), render.PAPER)
+        d = ImageDraw.Draw(img)
+        hours = [{"hour": 9 + i, "ampm_label": "9a", "is_daytime": True,
+                  "condition": "CLEAR", "icon_uri": "", "temp_f": 70, "feels_f": 70,
+                  "pop": pop, "precip_type": "RAIN", "thunder": 0, "uv": 3}
+                 for i in range(12)]
+        render.draw_graph(img, d, hours, [], [None] * 12,
+                          14, render.GRAPH_Y, W - 28, render.GRAPH_H)
+        return img
+
+    def strip_has_marks(img):
+        # scan the lower precip band (safely below any temperature gridline) for
+        # any non-background pixel — gridlines, bars, or the caption.
+        for y in range(axis_y - 60, axis_y - 1):
+            for x in range(45, W - 20):
+                if img.getpixel((x, y)) != render.PAPER:
+                    return True
+        return False
+
+    assert strip_has_marks(render_strip(60)) is True    # wet: lines + bars present
+    assert strip_has_marks(render_strip(0)) is False     # dry: strip completely clean

@@ -153,6 +153,12 @@ def draw_graph(img, draw, hours, bands, icons, gx, gy, gw, gh):
     # precip strip (grounded pop% bars, colored by kind)
     pbase = axis_y
     sc = bandh - 14
+    wet = any(h["pop"] >= 5 for h in hours)
+    if wet:
+        # faint 50% + 100% reference lines so each bar reads against its ceiling
+        for frac in (0.5, 1.0):
+            gyv = pbase - sc * frac
+            draw.line([lx, gyv, gx + gw, gyv], fill=(230, 231, 236), width=1)
     for i, h in enumerate(hours):
         pop = h["pop"]
         if pop < 5:
@@ -164,7 +170,8 @@ def draw_graph(img, draw, hours, bands, icons, gx, gy, gw, gh):
         col = _KIND_BAR.get(kind, BLUE)
         draw.rectangle([bx - bw, pbase - bh, bx + bw, pbase], fill=col)
         _ctext(draw, "{}%".format(pop), bx, pbase - bh - 8, display_font(12, 600), col)
-    _ctext(draw, "RAIN %", gx + 2, pbase - bandh + 2, display_font(10, 600), INK, anchor="lm")
+    if wet:
+        _ctext(draw, "RAIN %", gx + 2, pbase - bandh + 2, display_font(10, 600), INK, anchor="lm")
 
     # temp line + points + labels + icons
     ys = [Y(t) for t in temps]
