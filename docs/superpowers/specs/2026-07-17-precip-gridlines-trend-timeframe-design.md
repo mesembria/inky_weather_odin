@@ -65,22 +65,39 @@ The **detail** line names which two days are being compared:
   phrase already carries the framing, and the card is width-constrained (~253px
   at font 14).
 
-### 2b. Pivot forward late in the day
+### 2b. Pivot forward once today's high has passed
 
 By late afternoon today's high has already happened, so "today vs yesterday" is
-stale. Pivot the **default day-over-day comparison** based on the current local
-hour (`hours[0]["hour"]`, 0–23):
+stale. Pivot the **default day-over-day comparison** using a **data-driven proxy
+for "has today's peak passed?"** — no clock constant, no extra API calls.
 
-- **Before the cutoff (morning/midday):** compare **today vs yesterday** (needs
-  persisted `yesterday`). Detail: `today {hi}° · {n}° warmer/cooler than
-  yesterday` / `today {hi}° · same as yesterday`.
-- **At/after the cutoff:** compare **tomorrow vs today** (needs `tomorrow` from
-  the Google daily forecast, `days[1]`). Detail: `tomorrow {hi}° · {n}°
-  warmer/cooler than today` / `tomorrow {hi}° · same as today`.
+**Why a proxy and not the real high-hour:** Google's daily response carries
+`maxTemperature: {degrees}` with no time, and its hourly endpoint is forward-only
+(this morning's hours are gone by afternoon). So the exact peak hour isn't cheaply
+knowable. Instead we ask the equivalent question from data we already fetch: *does
+the remaining part of today still reach the daily high?*
 
-New constant `TREND_PIVOT_HOUR = 15` (3pm). Chosen so the pivot is active by 4pm
-(the user's example) and today's high — typically 3–5pm — is essentially
-realized. Adjustable knob; called out here for review.
+**Proxy rule.** From the 12h hourly window, take the **leading run of today's
+hours** — `hours[0]` plus each following hour while its `hour` value keeps
+increasing; the first drop marks the wrap into tomorrow. Let
+`today_remaining_max = max(temp_f over that run)` and `today_hi = today["hi_f"]`.
+
+- **High still ahead → today vs yesterday:** `today_remaining_max >= today_hi -
+  TREND_HIGH_REACHED_TOL`. Detail: `today {hi}° · {n}° warmer/cooler than
+  yesterday` / `today {hi}° · same as yesterday`. Needs persisted `yesterday`.
+- **High has passed → tomorrow vs today:** otherwise. Detail: `tomorrow {hi}° ·
+  {n}° warmer/cooler than today` / `tomorrow {hi}° · same as today`. Needs
+  `tomorrow` from `days[1]`.
+
+New constant `TREND_HIGH_REACHED_TOL = 1` (°F): the remaining window still "reaches"
+the high if within 1°F of it, absorbing rounding between Google's daily max and the
+hourly buckets (both from Google, so already close). Effectively pivots ~1–2h after
+the peak. Adjustable knob.
+
+Self-adjusting behavior: pivots earlier on a short winter day, later on a long
+summer one; after midnight the new day's full window reaches its high again, so the
+card returns to today-vs-yesterday. `today_hi` and the hourly `temp_f` are both
+Google-sourced, keeping the comparison bias-free like the rest of the card.
 
 - **Verdict words are unchanged** in both directions (Steady / Warmer day /
   Cooler day / Much warmer / Much cooler), keyed on `dhi`. The detail line is what
@@ -91,8 +108,8 @@ realized. Adjustable knob; called out here for review.
   remains meaningful in the afternoon; only the day-over-day default pivots. The
   stretch check runs first, as today; the pivot applies only when it doesn't fire.
 - **Returns `None`** (card omitted, slot goes to the next-best card) when the
-  needed neighbor is missing: no `yesterday` before the cutoff, or no `tomorrow`
-  after it.
+  needed neighbor is missing: no `yesterday` while the high is still ahead, or no
+  `tomorrow` once it has passed.
 
 ### Data wiring
 
@@ -101,9 +118,11 @@ realized. Adjustable knob; called out here for review.
   unchanged.
 - `main.build_image`'s **fixture** branch adds a synthetic `"tomorrow"` (from
   `days[1]`) so the offline preview still renders a trend card.
-- `_trend_card` gains `tomorrow` and `now_hour` parameters. `build_cards` derives
-  `now_hour = hours[0]["hour"]` and passes it through; no new argument to
-  `build_cards` itself.
+- `_trend_card` gains a `tomorrow` param and a `forward` bool (whether today's
+  high has passed). `build_cards` computes `forward` via a small helper
+  `_today_high_passed(hours, today_hi)` — isolates today's leading run, compares
+  its max `temp_f` to `today_hi` with `TREND_HIGH_REACHED_TOL`. No new argument to
+  `build_cards` itself (it already has `hours` and `trend`).
 - Precedence vs OUTLOOK is unchanged: if both fire in the afternoon, TREND
   (nearer-term, higher score) still wins the slot. No scoring change.
 
@@ -113,14 +132,17 @@ realized. Adjustable knob; called out here for review.
   (e.g. `"high 78° (-7) · low 58° (-7)"`, `"high 80° · ~ yesterday"`,
   `"high 70° · warmer around it"`). Update every asserted trend detail to the new
   format. Verdict/accent/score assertions are unchanged.
-- The trend tests / `_hours` helper must set `hours[0]["hour"]` and the
-  `_trend_card`/`_trend` helpers must supply `tomorrow` + `now_hour`. Existing
-  day-over-day tests run with a **before-cutoff** hour (e.g. 9) so they still
-  exercise the today-vs-yesterday branch.
-- Add pivot tests: at/after `TREND_PIVOT_HOUR` the card compares tomorrow vs today
-  (`"tomorrow …° · … than today"`); before it, today vs yesterday. Cover the
-  boundary hour (`== TREND_PIVOT_HOUR` pivots) and the `None` cases (no
-  `yesterday` before cutoff, no `tomorrow` after).
+- The trend tests / `_hours` helper must set each hour's `hour` field and supply
+  `tomorrow` to the `_trend`/`_trend_card` helpers. Existing day-over-day tests
+  build an `hours` window whose remaining run **reaches** `today_hi` (peak still
+  ahead), so they keep exercising the today-vs-yesterday branch.
+- Unit-test `_today_high_passed` directly: remaining run reaching the high → False;
+  remaining run below it by more than the tolerance → True; the midnight-wrap run
+  isolation (a window spanning today→tomorrow only counts today's leading hours);
+  and the tolerance boundary.
+- Add pivot tests through `_trend_card`/`build_cards`: high-passed window →
+  `"tomorrow …° · … than today"`; high-ahead window → today vs yesterday. Cover the
+  `None` cases (no `yesterday` when high still ahead, no `tomorrow` once passed).
 - Add a render-level check that the precip gridlines appear only when the window
   has rain chance — e.g. a smoke test that `draw_graph` on an all-dry `hours`
   list draws no `"RAIN %"` caption / no strip gridlines, and a wet list does.
