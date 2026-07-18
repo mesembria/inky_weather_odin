@@ -96,16 +96,54 @@ def _days(highs, names=None):
     return [{"hi_f": h, "name": n} for h, n in zip(highs, names)]
 
 
-def _trend(today, yesterday, stretch_his):
-    return {"today": today, "yesterday": yesterday, "stretch_his": stretch_his}
+def _trend(today, yesterday, stretch_his, tomorrow=None):
+    return {"today": today, "yesterday": yesterday,
+            "tomorrow": tomorrow, "stretch_his": stretch_his}
 
 
 def test_build_cards_includes_trend():
-    hrs = _hours([60, 63, 66, 68, 70, 71, 71, 70, 68, 66, 64, 62])
+    hrs = _hours([70, 73, 76, 78, 77, 75, 73, 71, 69, 67, 65, 63])  # reaches 78 (today_hi)
     cards = advice.build_cards(hrs, [], [], [], {"sunset": "8p"},
                                datetime.date(2026, 7, 15),
                                trend=_trend(_t(78, 58), _t(85, 63), []))
     assert any(c["cat"] == "TREND" and c["verdict"] == "Cooler day" for c in cards)
+
+
+def test_build_cards_forward_pivot_when_high_passed():
+    # remaining hours peak at 70°, below today's high (78°) -> pivot to tomorrow
+    hrs = _hours([70, 69, 68, 67, 66, 65, 64, 63, 62, 61, 60, 59])
+    cards = advice.build_cards(hrs, [], [], [], {"sunset": "8p"},
+                               datetime.date(2026, 7, 15),
+                               trend=_trend(_t(78, 58), _t(85, 63), [], tomorrow=_t(84)))
+    trend = [c for c in cards if c["cat"] == "TREND"]
+    assert trend and "tomorrow" in trend[0]["detail"]
+
+
+def test_today_high_passed_high_still_ahead():
+    hrs = [{"hour": 9 + i, "temp_f": t}
+           for i, t in enumerate([70, 74, 78, 84, 82, 80])]
+    assert advice._today_high_passed(hrs, 84) is False   # reaches the high
+
+
+def test_today_high_passed_high_behind():
+    hrs = [{"hour": 9 + i, "temp_f": t}
+           for i, t in enumerate([80, 78, 76, 74, 72, 70])]
+    assert advice._today_high_passed(hrs, 84) is True     # 80 < 84 - 1
+
+
+def test_today_high_passed_tolerance_boundary():
+    hrs = [{"hour": 12, "temp_f": 83}]
+    assert advice._today_high_passed(hrs, 84) is False    # within 1°F tolerance
+    hrs = [{"hour": 12, "temp_f": 82}]
+    assert advice._today_high_passed(hrs, 84) is True      # more than 1°F below
+
+
+def test_today_high_passed_ignores_tomorrow_after_wrap():
+    # window wraps past midnight: today's leading run is [22, 23]; tomorrow's warm
+    # 90° must NOT count toward today reaching its high.
+    hrs = [{"hour": 22, "temp_f": 70}, {"hour": 23, "temp_f": 68},
+           {"hour": 0, "temp_f": 90}, {"hour": 1, "temp_f": 88}]
+    assert advice._today_high_passed(hrs, 78) is True
 
 
 def test_build_cards_hazard_can_bump_trend():

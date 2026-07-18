@@ -11,6 +11,7 @@ MUGGY_DEWPOINT_F = 60   # daytime dew point at/above this reads as "muggy"
 TREND_HI_FLAT = 2        # |Δhigh| <= this reads as "Steady"
 TREND_HI_BIG = 10        # |Δhigh| >= this reads as "Much warmer/cooler"
 TREND_WINDOW_MARGIN = 3  # today must beat its nearest neighbor by this to be a peak/dip
+TREND_HIGH_REACHED_TOL = 1  # °F; remaining window still "reaches" the daily high
 TREND_SCORE = 65
 OUTLOOK_NET = 8          # min |net high change| over the next 3 days to fire
 OUTLOOK_SCORE = 54       # informational; below TREND
@@ -87,6 +88,25 @@ def _trend_verdict(dhi):
     if dhi >= TREND_HI_FLAT + 1:
         return "Warmer day", "orange"
     return "Steady", "gray"
+
+
+def _today_high_passed(hours, today_hi):
+    """True once today's remaining forecast no longer reaches the daily high.
+
+    The hourly feed is forward-only, so 'today's remaining hours' are its leading
+    run — up to the first wrap past midnight. If that run's warmest hour falls
+    more than TREND_HIGH_REACHED_TOL below the day's high, today's peak is behind
+    us and the trend card should pivot to tomorrow.
+    """
+    if not hours:
+        return False
+    run = [hours[0]]
+    for prev, h in zip(hours, hours[1:]):
+        if h["hour"] > prev["hour"]:
+            run.append(h)
+        else:
+            break
+    return max(h["temp_f"] for h in run) < today_hi - TREND_HIGH_REACHED_TOL
 
 
 def _trend_card(today, yesterday, stretch_his, tomorrow=None, forward=False):
@@ -285,7 +305,9 @@ def build_cards(hours, bands, gust, aqi, sun, date, days=None, trend=None):
     has_hazard = any(s >= 50 for s, _ in scored)
     scored += _info_tier(hours, bands, sun, date, has_hazard)
     if trend:
-        t = _trend_card(trend["today"], trend["yesterday"], trend["stretch_his"])
+        t = _trend_card(trend["today"], trend["yesterday"], trend["stretch_his"],
+                        tomorrow=trend.get("tomorrow"),
+                        forward=_today_high_passed(hours, trend["today"]["hi_f"]))
         if t:
             scored.append(t)
     if days:
