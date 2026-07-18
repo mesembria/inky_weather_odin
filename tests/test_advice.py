@@ -135,37 +135,39 @@ def test_trend_card_cooler_day():
     s, c = advice._trend_card(_t(78, 58), _t(85, 65), [])
     assert s == advice.TREND_SCORE and c["cat"] == "TREND"
     assert c["verdict"] == "Cooler day" and c["accent"] == "blue"
-    assert c["detail"] == "high 78° (-7) · low 58° (-7)"
+    assert c["detail"] == "today 78° · 7° cooler than yesterday"
 
 
-def test_trend_card_appends_low_when_it_moves():
+def test_trend_card_drops_low_delta():
+    # the low-delta append is gone; only the high framing remains
     s, c = advice._trend_card(_t(78, 58), _t(85, 63), [])
-    assert c["detail"] == "high 78° (-7) · low 58° (-5)"
+    assert c["detail"] == "today 78° · 7° cooler than yesterday"
+    assert "low" not in c["detail"]
 
 
 def test_trend_card_steady_when_flat():
     s, c = advice._trend_card(_t(80), _t(80), [])
     assert c["verdict"] == "Steady" and c["accent"] == "gray"
-    assert c["detail"] == "high 80° · ~ yesterday"
+    assert c["detail"] == "today 80° · same as yesterday"
 
 
 def test_trend_card_much_warmer():
     s, c = advice._trend_card(_t(76, 56), _t(64, 44), [])
     assert c["verdict"] == "Much warmer" and c["accent"] == "orange"
-    assert c["detail"] == "high 76° (+12) · low 56° (+12)"
+    assert c["detail"] == "today 76° · 12° warmer than yesterday"
 
 
 def test_trend_card_coolest_stretch_upgrade():
     # today strictly the lowest high of the surrounding stretch, by >= 3
     s, c = advice._trend_card(_t(70), _t(72), [84, 85, 86, 80])
     assert c["verdict"] == "Coolest stretch" and c["accent"] == "blue"
-    assert c["detail"] == "high 70° · warmer around it"
+    assert c["detail"] == "today 70° · coolest day this week"
 
 
 def test_trend_card_warmest_stretch_upgrade():
     s, c = advice._trend_card(_t(90), _t(80), [76, 73, 71, 80])
     assert c["verdict"] == "Warmest stretch" and c["accent"] == "orange"
-    assert c["detail"] == "high 90° · cooler around it"
+    assert c["detail"] == "today 90° · warmest day this week"
 
 
 def test_trend_card_upgrade_without_yesterday():
@@ -198,6 +200,28 @@ def test_trend_card_dhi_minus3_is_cooler_day():
 def test_trend_card_dhi_plus3_is_warmer_day():
     s, c = advice._trend_card(_t(80), _t(77), [])
     assert c["verdict"] == "Warmer day" and c["accent"] == "orange"
+
+
+def test_trend_card_forward_tomorrow_warmer():
+    s, c = advice._trend_card(_t(70), _t(72), [], tomorrow=_t(75), forward=True)
+    assert c["verdict"] == "Warmer day" and c["accent"] == "orange"
+    assert c["detail"] == "tomorrow 75° · 5° warmer than today"
+
+
+def test_trend_card_forward_tomorrow_cooler():
+    s, c = advice._trend_card(_t(80), _t(78), [], tomorrow=_t(74), forward=True)
+    assert c["verdict"] == "Cooler day" and c["accent"] == "blue"
+    assert c["detail"] == "tomorrow 74° · 6° cooler than today"
+
+
+def test_trend_card_forward_steady():
+    s, c = advice._trend_card(_t(80), _t(70), [], tomorrow=_t(80), forward=True)
+    assert c["verdict"] == "Steady"
+    assert c["detail"] == "tomorrow 80° · same as today"
+
+
+def test_trend_card_forward_none_without_tomorrow():
+    assert advice._trend_card(_t(80), _t(70), [], tomorrow=None, forward=True) is None
 
 
 def test_trend_card_dhi_minus10_is_much_cooler():

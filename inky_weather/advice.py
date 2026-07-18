@@ -10,7 +10,6 @@ ICE_TYPES = ("ICE", "SLEET", "FREEZING_RAIN")
 MUGGY_DEWPOINT_F = 60   # daytime dew point at/above this reads as "muggy"
 TREND_HI_FLAT = 2        # |Δhigh| <= this reads as "Steady"
 TREND_HI_BIG = 10        # |Δhigh| >= this reads as "Much warmer/cooler"
-TREND_LOW_DETAIL = 5     # append the low delta when |Δlow| >= this
 TREND_WINDOW_MARGIN = 3  # today must beat its nearest neighbor by this to be a peak/dip
 TREND_SCORE = 65
 OUTLOOK_NET = 8          # min |net high change| over the next 3 days to fire
@@ -77,17 +76,30 @@ def _w1(hs):
     return hs[-1]["ampm_label"].lower()
 
 
-def _trend_card(today, yesterday, stretch_his):
-    """Day-over-day TREND card, Google-sourced, upgrading to a peak/dip framing.
+def _trend_verdict(dhi):
+    """(verdict, accent) for a day-over-day high change `dhi` (°F)."""
+    if dhi <= -TREND_HI_BIG:
+        return "Much cooler", "blue"
+    if dhi <= -(TREND_HI_FLAT + 1):
+        return "Cooler day", "blue"
+    if dhi >= TREND_HI_BIG:
+        return "Much warmer", "orange"
+    if dhi >= TREND_HI_FLAT + 1:
+        return "Warmer day", "orange"
+    return "Steady", "gray"
 
-    All temps come from Google (the trusted deterministic source), so the card's
-    numbers match the rest of the display and the day-over-day delta carries no
-    cross-model bias:
-      today:       {"hi_f","lo_f"} for today (Google forecast; required).
-      yesterday:   {"hi_f","lo_f"} recorded for yesterday, or None (no history yet).
-      stretch_his: highs of the surrounding days (persisted past + forward
-                   forecast), EXCLUDING today; used only for the peak/dip upgrade.
-    Returns (score, card), or None before any history has accumulated.
+
+def _trend_card(today, yesterday, stretch_his, tomorrow=None, forward=False):
+    """Day-over-day TREND card, Google-sourced, with a peak/dip upgrade.
+
+    Before today's high is reached the card compares today vs yesterday; once it
+    has passed (`forward=True`) it flips to tomorrow vs today so the day-scale
+    trend stays relevant late in the day. The detail line names both days.
+
+      today/yesterday/tomorrow: {"hi_f","lo_f"} (yesterday/tomorrow may be None).
+      stretch_his: highs of the surrounding days, EXCLUDING today; peak/dip only.
+      forward: True once today's high is behind us (see _today_high_passed).
+    Returns (score, card), or None when the needed neighbor day is missing.
     """
     if not today:
         return None
@@ -98,31 +110,27 @@ def _trend_card(today, yesterday, stretch_his):
     if len(stretch_his) >= 4:
         if hi < min(stretch_his) and min(stretch_his) - hi >= TREND_WINDOW_MARGIN:
             return (TREND_SCORE, _card("TREND", "Coolest stretch",
-                                       "high {}° · warmer around it".format(hi), "blue"))
+                                       "today {}° · coolest day this week".format(hi), "blue"))
         if hi > max(stretch_his) and hi - max(stretch_his) >= TREND_WINDOW_MARGIN:
             return (TREND_SCORE, _card("TREND", "Warmest stretch",
-                                       "high {}° · cooler around it".format(hi), "orange"))
-    # default: day-over-day on the high (needs yesterday from persisted history)
-    if not yesterday:
-        return None
-    dhi = hi - yesterday["hi_f"]
-    dlo = today["lo_f"] - yesterday["lo_f"]
-    if dhi <= -TREND_HI_BIG:
-        verdict, accent = "Much cooler", "blue"
-    elif dhi <= -(TREND_HI_FLAT + 1):
-        verdict, accent = "Cooler day", "blue"
-    elif dhi >= TREND_HI_BIG:
-        verdict, accent = "Much warmer", "orange"
-    elif dhi >= TREND_HI_FLAT + 1:
-        verdict, accent = "Warmer day", "orange"
+                                       "today {}° · warmest day this week".format(hi), "orange"))
+    # default: day-over-day, pivoting to tomorrow once today's high has passed
+    if forward:
+        if not tomorrow:
+            return None
+        ref, base, ref_hi = "tomorrow", "today", tomorrow["hi_f"]
+        dhi = tomorrow["hi_f"] - hi
     else:
-        verdict, accent = "Steady", "gray"
+        if not yesterday:
+            return None
+        ref, base, ref_hi = "today", "yesterday", hi
+        dhi = hi - yesterday["hi_f"]
+    verdict, accent = _trend_verdict(dhi)
     if verdict == "Steady":
-        detail = "high {}° · ~ yesterday".format(hi)
+        detail = "{} {}° · same as {}".format(ref, ref_hi, base)
     else:
-        detail = "high {}° ({:+d})".format(hi, dhi)
-        if abs(dlo) >= TREND_LOW_DETAIL:
-            detail += " · low {}° ({:+d})".format(today["lo_f"], dlo)
+        word = "warmer" if dhi > 0 else "cooler"
+        detail = "{} {}° · {}° {} than {}".format(ref, ref_hi, abs(dhi), word, base)
     return (TREND_SCORE, _card("TREND", verdict, detail, accent))
 
 
