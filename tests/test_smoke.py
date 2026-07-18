@@ -57,8 +57,45 @@ def test_precip_gridlines_and_caption_only_when_wet():
 
     W, H = render.WIDTH, render.HEIGHT
     axis_y = render.GRAPH_Y + render.GRAPH_H - 16   # matches draw_graph's axis_y
+    sc = 82 - 14                                    # bandh - 14 (bar-band scale)
+    y100, y50 = axis_y - sc, axis_y - int(sc * 0.5)  # 100% and 50% gridline rows
+    x_clear = 100   # on the full-width gridlines, but clear of every bar column
+    GRID = (230, 231, 236)
 
-    def render_strip(pop):
+    def render_hours(pops):
+        img = Image.new("RGB", (W, H), render.PAPER)
+        d = ImageDraw.Draw(img)
+        hours = [{"hour": 9 + i, "ampm_label": "9a", "is_daytime": True,
+                  "condition": "CLEAR", "icon_uri": "", "temp_f": 70, "feels_f": 70,
+                  "pop": p, "precip_type": "RAIN", "thunder": 0, "uv": 3}
+                 for i, p in enumerate(pops)]
+        render.draw_graph(img, d, hours, [], [None] * len(pops),
+                          14, render.GRAPH_Y, W - 28, render.GRAPH_H)
+        return img
+
+    # wet: both reference lines are drawn, checked at a column clear of any bar
+    wet = render_hours([0, 0, 0, 0, 0, 60, 0, 0, 0, 0, 0, 0])
+    assert wet.getpixel((x_clear, y100)) == GRID   # 100% line present
+    assert wet.getpixel((x_clear, y50)) == GRID    # 50% line present
+    # dry: strip is completely clean — no lines, no caption, no bars
+    dry = render_hours([0] * 12)
+    assert dry.getpixel((x_clear, y100)) == render.PAPER
+    assert dry.getpixel((x_clear, y50)) == render.PAPER
+    for y in range(axis_y - sc - 2, axis_y - 1):
+        for x in range(45, W - 20):
+            assert dry.getpixel((x, y)) == render.PAPER
+
+
+def test_precip_gridlines_gate_at_pop_boundary():
+    from PIL import Image, ImageDraw
+    from inky_weather import render
+
+    W, H = render.WIDTH, render.HEIGHT
+    axis_y = render.GRAPH_Y + render.GRAPH_H - 16
+    y100 = axis_y - (82 - 14)
+    GRID, x_clear = (230, 231, 236), 100
+
+    def gridline_present(pop):
         img = Image.new("RGB", (W, H), render.PAPER)
         d = ImageDraw.Draw(img)
         hours = [{"hour": 9 + i, "ampm_label": "9a", "is_daytime": True,
@@ -67,16 +104,7 @@ def test_precip_gridlines_and_caption_only_when_wet():
                  for i in range(12)]
         render.draw_graph(img, d, hours, [], [None] * 12,
                           14, render.GRAPH_Y, W - 28, render.GRAPH_H)
-        return img
+        return img.getpixel((x_clear, y100)) == GRID
 
-    def strip_has_marks(img):
-        # scan the lower precip band (safely below any temperature gridline) for
-        # any non-background pixel — gridlines, bars, or the caption.
-        for y in range(axis_y - 60, axis_y - 1):
-            for x in range(45, W - 20):
-                if img.getpixel((x, y)) != render.PAPER:
-                    return True
-        return False
-
-    assert strip_has_marks(render_strip(60)) is True    # wet: lines + bars present
-    assert strip_has_marks(render_strip(0)) is False     # dry: strip completely clean
+    assert gridline_present(5) is True     # pop == 5 -> wet gate open, lines drawn
+    assert gridline_present(4) is False    # pop == 4 -> strip stays clean
