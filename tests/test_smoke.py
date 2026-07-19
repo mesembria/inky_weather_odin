@@ -36,12 +36,75 @@ def test_fixture_synthesizes_cooler_day_trend():
     assert result[1]["cat"] == "TREND" and result[1]["verdict"] == "Cooler day"
 
 
-def test_trend_absent_on_first_run():
-    # no persisted history yet -> trend_input yields no yesterday -> no TREND card
+def test_trend_first_run_forward_uses_tomorrow():
+    # No persisted history yet. The fixture window's high is already behind, so the
+    # trend pivots to tomorrow-vs-today — available from the forecast alone.
     import datetime
     from inky_weather import weather, advice, main, history
     hours, days = weather.load_from_fixtures(main.FIXTURE_DIR)
     trend = history.trend_input(days, {}, datetime.date(2026, 7, 7))
-    cards = advice.build_cards(hours, [], [], [], {}, datetime.date(2026, 7, 7),
-                               days=days, trend=trend)
-    assert not any(c["cat"] == "TREND" for c in cards)
+    forward = advice._today_high_passed(hours, trend["today"]["hi_f"])
+    assert forward is True
+    card = advice._trend_card(trend["today"], trend["yesterday"], trend["stretch_his"],
+                              tomorrow=trend["tomorrow"], forward=forward)
+    assert card is not None
+    assert "tomorrow" in card[1]["detail"]
+
+
+def test_precip_gridlines_and_caption_only_when_wet():
+    from PIL import Image, ImageDraw
+    from inky_weather import render
+
+    W, H = render.WIDTH, render.HEIGHT
+    axis_y = render.GRAPH_Y + render.GRAPH_H - 16   # matches draw_graph's axis_y
+    sc = 82 - 14                                    # bandh - 14 (bar-band scale)
+    y100, y50 = axis_y - sc, axis_y - int(sc * 0.5)  # 100% and 50% gridline rows
+    x_clear = 100   # on the full-width gridlines, but clear of every bar column
+    GRID = (230, 231, 236)
+
+    def render_hours(pops):
+        img = Image.new("RGB", (W, H), render.PAPER)
+        d = ImageDraw.Draw(img)
+        hours = [{"hour": 9 + i, "ampm_label": "9a", "is_daytime": True,
+                  "condition": "CLEAR", "icon_uri": "", "temp_f": 70, "feels_f": 70,
+                  "pop": p, "precip_type": "RAIN", "thunder": 0, "uv": 3}
+                 for i, p in enumerate(pops)]
+        render.draw_graph(img, d, hours, [], [None] * len(pops),
+                          14, render.GRAPH_Y, W - 28, render.GRAPH_H)
+        return img
+
+    # wet: both reference lines are drawn, checked at a column clear of any bar
+    wet = render_hours([0, 0, 0, 0, 0, 60, 0, 0, 0, 0, 0, 0])
+    assert wet.getpixel((x_clear, y100)) == GRID   # 100% line present
+    assert wet.getpixel((x_clear, y50)) == GRID    # 50% line present
+    # dry: strip is completely clean — no lines, no caption, no bars
+    dry = render_hours([0] * 12)
+    assert dry.getpixel((x_clear, y100)) == render.PAPER
+    assert dry.getpixel((x_clear, y50)) == render.PAPER
+    for y in range(axis_y - sc - 2, axis_y - 1):
+        for x in range(45, W - 20):
+            assert dry.getpixel((x, y)) == render.PAPER
+
+
+def test_precip_gridlines_gate_at_pop_boundary():
+    from PIL import Image, ImageDraw
+    from inky_weather import render
+
+    W, H = render.WIDTH, render.HEIGHT
+    axis_y = render.GRAPH_Y + render.GRAPH_H - 16
+    y100 = axis_y - (82 - 14)
+    GRID, x_clear = (230, 231, 236), 100
+
+    def gridline_present(pop):
+        img = Image.new("RGB", (W, H), render.PAPER)
+        d = ImageDraw.Draw(img)
+        hours = [{"hour": 9 + i, "ampm_label": "9a", "is_daytime": True,
+                  "condition": "CLEAR", "icon_uri": "", "temp_f": 70, "feels_f": 70,
+                  "pop": pop, "precip_type": "RAIN", "thunder": 0, "uv": 3}
+                 for i in range(12)]
+        render.draw_graph(img, d, hours, [], [None] * 12,
+                          14, render.GRAPH_Y, W - 28, render.GRAPH_H)
+        return img.getpixel((x_clear, y100)) == GRID
+
+    assert gridline_present(5) is True     # pop == 5 -> wet gate open, lines drawn
+    assert gridline_present(4) is False    # pop == 4 -> strip stays clean

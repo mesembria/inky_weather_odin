@@ -41,10 +41,13 @@ def build_image(use_fixture, cfg):
         aqi = weather.load_airquality_fixture(FIXTURE_DIR, fh)
         dew = weather.load_dewpoint_fixture(FIXTURE_DIR, fh)
         sun = {"sunset": "8p", "sunrise": "6a"}
-        # No persisted history offline — synthesize a warmer "yesterday" so the
-        # demo/preview shows a representative "Cooler day" trend card.
+        # No persisted history offline. Provide a synthetic yesterday and a real
+        # tomorrow (days[1]) so the preview renders a trend card either way — the
+        # bundled fixture's high is already behind its window, so it renders the
+        # forward "tomorrow vs today" pivot.
         trend = {"today": {"hi_f": days[0]["hi_f"], "lo_f": days[0]["lo_f"]},
                  "yesterday": {"hi_f": days[0]["hi_f"] + 6, "lo_f": days[0]["lo_f"] + 4},
+                 "tomorrow": {"hi_f": days[1]["hi_f"], "lo_f": days[1]["lo_f"]},
                  "stretch_his": [d["hi_f"] for d in days[1:4]]}
     else:
         hours, days = weather.fetch_live(cfg["lat"], cfg["long"], cfg["google_weather_key"])

@@ -40,8 +40,14 @@ def test_trend_input_assembles_today_yesterday_and_stretch():
     ti = history.trend_input(days, hist, datetime.date(2026, 7, 8))
     assert ti["today"] == {"hi_f": 88, "lo_f": 60}
     assert ti["yesterday"] == {"hi_f": 92, "lo_f": 63}
+    assert ti["tomorrow"] == {"hi_f": 91, "lo_f": None}   # days[1] high; lo optional
     # 3 persisted past highs + 3 forecast forward highs, today excluded
     assert ti["stretch_his"] == [95, 93, 92, 91, 94, 90]
+
+
+def test_trend_input_no_tomorrow_when_single_day():
+    ti = history.trend_input([{"hi_f": 88, "lo_f": 60}], {}, datetime.date(2026, 7, 8))
+    assert ti["tomorrow"] is None
 
 
 def test_trend_input_no_history_has_no_yesterday():
