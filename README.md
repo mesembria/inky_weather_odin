@@ -62,3 +62,42 @@ python3 -m inky_weather.main --fixture --out fixture.out.png
 The `inky` library is only needed on the Pi; it is imported lazily so tests and
 `--out` rendering work without it. On the Pi, install everything with
 `pip install -r requirements.txt` inside the venv (see Setup above).
+
+### The PNG lies: design against the 7-colour palette
+
+**A `--out` PNG is not what the panel shows.** `main.py` hands a full RGB image to
+the `inky` library, which quantizes it to the panel's seven colours — black, white,
+red, green, blue, yellow, orange. There is **no gray**. Any near-white tone snaps to
+pure white and disappears on the hardware while looking perfect in the PNG.
+
+This has already shipped a bug once: the precip reference lines used a faint gray
+`(230, 231, 236)`, rendered correctly in every local preview and every test, and were
+invisible on the device.
+
+Rules for anything you draw:
+
+- **Never encode meaning in lightness.** A "faint" or "subtle" element cannot be a
+  pale colour. Get faintness from *coverage* instead — see `_dotted_line()` in
+  `render.py`, which draws one pixel every three so a full-ink rule reads light.
+- **Check any new colour constant against the palette** before using it. Add it to
+  the guard in `test_gridlines_survive_seven_color_quantization`
+  (`tests/test_smoke.py`) so a non-surviving colour fails the suite rather than
+  shipping to the panel.
+- **Known-invisible constants** still in `render.py`: `FAINT = (225, 226, 230)` and
+  `COLOR_DRY = (210, 210, 210)`. Both quantize to white. Do not use them for
+  anything load-bearing.
+
+To preview what the panel will actually display, quantize the render yourself:
+
+```bash
+python3 -m inky_weather.main --fixture --out preview.png
+python3 -c "
+from PIL import Image
+PANEL=[(0,0,0),(255,255,255),(0,255,0),(0,0,255),(255,0,0),(255,255,0),(255,140,0)]
+im=Image.open('preview.png').convert('RGB')
+q=Image.new('RGB',im.size)
+q.putdata([min(PANEL,key=lambda p:sum((a-b)**2 for a,b in zip(p,c))) for c in im.getdata()])
+q.save('panel_sim.png')"
+```
+
+Review `panel_sim.png`, not `preview.png`, when judging whether a visual change works.
