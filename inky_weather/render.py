@@ -30,6 +30,10 @@ INK = (20, 22, 28)
 PURPLE = (150, 40, 140)
 GRAY = (120, 122, 130)
 FAINT = (225, 226, 230)
+# Gridlines must survive the panel's 7-color quantization: a near-white gray snaps to
+# white and vanishes on the hardware. Use ink and get "faint" from dot coverage instead.
+GRIDLINE = INK
+GRIDLINE_STEP = 3
 
 ACCENTS = {"red": RED, "orange": ORANGE, "blue": BLUE, "green": GREEN,
            "purple": PURPLE, "ink": INK, "gray": GRAY}
@@ -68,6 +72,13 @@ HEADER_RULE_Y = 40
 def _ctext(d, t, cx, cy, font, fill, anchor="mm"):
     """Draw text with anchor point."""
     d.text((cx, cy), t, font=font, fill=fill, anchor=anchor)
+
+
+def _dotted_line(d, x0, x1, y, fill, step=GRIDLINE_STEP):
+    """Horizontal dotted rule: one pixel every `step`, so it reads faint on the panel."""
+    y = int(round(y))
+    for x in range(int(round(x0)), int(round(x1)) + 1, step):
+        d.point((x, y), fill=fill)
 
 
 # Graph layout constants for ensemble display
@@ -140,7 +151,7 @@ def draw_graph(img, draw, hours, bands, icons, gx, gy, gw, gh):
         if g < mn - 2 or g > mx + 2:
             continue
         gyv = Y(g)
-        draw.line([lx, gyv, gx + gw, gyv], fill=(230, 231, 236), width=1)
+        _dotted_line(draw, lx, gx + gw, gyv, GRIDLINE)
         _ctext(draw, "{}°".format(g), gx + 2, gyv, display_font(12, 600), INK, anchor="lm")
 
     # nested ensemble band
@@ -158,7 +169,7 @@ def draw_graph(img, draw, hours, bands, icons, gx, gy, gw, gh):
         # faint 50% + 100% reference lines so each bar reads against its ceiling
         for frac in (0.5, 1.0):
             gyv = pbase - sc * frac
-            draw.line([lx, gyv, gx + gw, gyv], fill=(230, 231, 236), width=1)
+            _dotted_line(draw, lx, gx + gw, gyv, GRIDLINE)
     for i, h in enumerate(hours):
         pop = h["pop"]
         if pop < 5:

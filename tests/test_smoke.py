@@ -51,6 +51,36 @@ def test_trend_first_run_forward_uses_tomorrow():
     assert "tomorrow" in card[1]["detail"]
 
 
+def test_gridlines_survive_seven_color_quantization():
+    # The Inky Impression is a 7-color panel; main.py hands the RGB image to the inky
+    # library, which quantizes it. A near-white gridline snaps to white and vanishes on
+    # the panel even though it looks correct in the RGB PNG. Guard the color choice.
+    from inky_weather import render
+
+    PANEL = [(0, 0, 0), (255, 255, 255), (0, 255, 0), (0, 0, 255),
+             (255, 0, 0), (255, 255, 0), (255, 140, 0)]
+
+    def nearest(c):
+        return min(PANEL, key=lambda p: sum((a - b) ** 2 for a, b in zip(p, c)))
+
+    assert nearest(render.GRIDLINE) != (255, 255, 255)
+
+
+def test_gridlines_are_dotted_not_solid():
+    # "Faint" has to come from coverage, not lightness — there is no gray in the panel
+    # palette. A solid black rule would read far too heavy.
+    from PIL import Image, ImageDraw
+    from inky_weather import render
+
+    img = Image.new("RGB", (200, 20), render.PAPER)
+    d = ImageDraw.Draw(img)
+    render._dotted_line(d, 10, 190, 10, render.GRIDLINE)
+    row = [img.getpixel((x, 10)) for x in range(10, 190)]
+    on = sum(1 for p in row if p == render.GRIDLINE)
+    assert on > 0                       # something is drawn
+    assert on < len(row) * 0.5          # but it is not a solid rule
+
+
 def test_precip_gridlines_and_caption_only_when_wet():
     from PIL import Image, ImageDraw
     from inky_weather import render
@@ -59,8 +89,12 @@ def test_precip_gridlines_and_caption_only_when_wet():
     axis_y = render.GRAPH_Y + render.GRAPH_H - 16   # matches draw_graph's axis_y
     sc = 82 - 14                                    # bandh - 14 (bar-band scale)
     y100, y50 = axis_y - sc, axis_y - int(sc * 0.5)  # 100% and 50% gridline rows
-    x_clear = 100   # on the full-width gridlines, but clear of every bar column
-    GRID = (230, 231, 236)
+    # gridlines are dotted, so scan a span rather than probing a single pixel
+    span = range(80, 130)   # on the full-width gridlines, clear of every bar column
+    GRID = render.GRIDLINE
+
+    def dots(img, y):
+        return sum(1 for x in span if img.getpixel((x, y)) == GRID)
 
     def render_hours(pops):
         img = Image.new("RGB", (W, H), render.PAPER)
@@ -75,12 +109,12 @@ def test_precip_gridlines_and_caption_only_when_wet():
 
     # wet: both reference lines are drawn, checked at a column clear of any bar
     wet = render_hours([0, 0, 0, 0, 0, 60, 0, 0, 0, 0, 0, 0])
-    assert wet.getpixel((x_clear, y100)) == GRID   # 100% line present
-    assert wet.getpixel((x_clear, y50)) == GRID    # 50% line present
+    assert dots(wet, y100) > 0     # 100% line present
+    assert dots(wet, y50) > 0      # 50% line present
     # dry: strip is completely clean — no lines, no caption, no bars
     dry = render_hours([0] * 12)
-    assert dry.getpixel((x_clear, y100)) == render.PAPER
-    assert dry.getpixel((x_clear, y50)) == render.PAPER
+    assert dots(dry, y100) == 0
+    assert dots(dry, y50) == 0
     for y in range(axis_y - sc - 2, axis_y - 1):
         for x in range(45, W - 20):
             assert dry.getpixel((x, y)) == render.PAPER
@@ -93,7 +127,7 @@ def test_precip_gridlines_gate_at_pop_boundary():
     W, H = render.WIDTH, render.HEIGHT
     axis_y = render.GRAPH_Y + render.GRAPH_H - 16
     y100 = axis_y - (82 - 14)
-    GRID, x_clear = (230, 231, 236), 100
+    GRID, span = render.GRIDLINE, range(80, 130)
 
     def gridline_present(pop):
         img = Image.new("RGB", (W, H), render.PAPER)
@@ -104,7 +138,7 @@ def test_precip_gridlines_gate_at_pop_boundary():
                  for i in range(12)]
         render.draw_graph(img, d, hours, [], [None] * 12,
                           14, render.GRAPH_Y, W - 28, render.GRAPH_H)
-        return img.getpixel((x_clear, y100)) == GRID
+        return any(img.getpixel((x, y100)) == GRID for x in span)
 
     assert gridline_present(5) is True     # pop == 5 -> wet gate open, lines drawn
     assert gridline_present(4) is False    # pop == 4 -> strip stays clean
