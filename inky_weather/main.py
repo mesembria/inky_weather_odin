@@ -4,7 +4,7 @@ import datetime
 import os
 import sys
 
-from . import weather, icons, render, advice, history, cache
+from . import weather, icons, render, advice, history, cache, version
 
 FIXTURE_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 ICON_CACHE = os.path.join(os.path.dirname(__file__), "assets", "icons")
@@ -81,6 +81,7 @@ def build_image(use_fixture, cfg):
         location_name=cfg.get("location_name", ""),
         date_str=now.strftime("%a %b %-d"),
         updated_str=now.strftime("%-I:%M%p").lower().lstrip("0"),
+        version=version.get_version(),
     )
 
 

@@ -90,7 +90,13 @@ BAND_IN = (178, 190, 224)
 _KIND_BAR = {"storm": RED, "snow": PURPLE, "mix": PURPLE, "rain": BLUE, "dry": BLUE}
 
 
-def draw_header(draw, location, date_str, updated_str, badge):
+def _updated_label(updated_str, version=None):
+    """The header's updated-time line, optionally suffixed with the running version."""
+    base = updated_str + " · NEXT 12H"
+    return base + " · " + version if version else base
+
+
+def draw_header(draw, location, date_str, updated_str, badge, version=None):
     """Draw the header band with location, date, confidence badge, and updated time."""
     _ctext(draw, (location or "").upper(), 20, 20, display_font(26, 600), INK, anchor="lm")
     w = draw.textlength((location or "").upper(), font=display_font(26, 600))
@@ -100,7 +106,7 @@ def draw_header(draw, location, date_str, updated_str, badge):
         glyph = _BADGE_GLYPH.get(label, "◇")
         _ctext(draw, glyph + " " + label, WIDTH - 20, 15, display_font(12, 600),
                ACCENTS.get(accent, INK), anchor="rm")
-    _ctext(draw, updated_str + " · NEXT 12H", WIDTH - 20, 30, display_font(12, 600), INK, anchor="rm")
+    _ctext(draw, _updated_label(updated_str, version), WIDTH - 20, 30, display_font(12, 600), INK, anchor="rm")
     draw.line([20, HEADER_RULE_Y, WIDTH - 20, HEADER_RULE_Y], fill=INK, width=2)
 
 
@@ -201,13 +207,13 @@ def draw_graph(img, draw, hours, bands, icons, gx, gy, gw, gh):
 
 
 def render_display(hours, bands, hour_icons, cards, badge,
-                   location_name, date_str, updated_str):
+                   location_name, date_str, updated_str, version=None):
     """Compose the full 800x480 image. Returns an RGB PIL Image."""
     img = Image.new("RGB", (WIDTH, HEIGHT), PAPER)
     draw = ImageDraw.Draw(img)
     draw_graph(img, draw, hours, bands, hour_icons, 14, GRAPH_Y, WIDTH - 28, GRAPH_H)
     draw_banner(draw, cards)
-    draw_header(draw, location_name, date_str, updated_str, badge)
+    draw_header(draw, location_name, date_str, updated_str, badge, version)
     return img
 
 

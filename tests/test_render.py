@@ -104,3 +104,19 @@ def test_stamp_stale_does_not_cover_confidence_badge():
                   for x in range(render.WIDTH - 60, render.WIDTH)
                   for y in range(render.HEADER_RULE_Y, render.HEADER_RULE_Y + 30)]
     assert render.RED in below_rule                # pill is present just below the header rule
+
+
+def test_updated_label_without_version():
+    assert render._updated_label("9:08pm") == "9:08pm · NEXT 12H"
+
+
+def test_updated_label_with_version():
+    assert render._updated_label("9:08pm", "v1.0.0") == "9:08pm · NEXT 12H · v1.0.0"
+
+
+def test_draw_header_renders_version_when_given():
+    img1, d1 = _blank()
+    render.draw_header(d1, "Town", "Tue Jun 30", "10:02 AM", None)
+    img2, d2 = _blank()
+    render.draw_header(d2, "Town", "Tue Jun 30", "10:02 AM", None, "v9.9.9")
+    assert img1.tobytes() != img2.tobytes()   # version text is actually drawn
