@@ -68,3 +68,19 @@ def test_render_display_dimensions_with_and_without_band():
         img = render.render_display(hours, b, [None] * 12, cards,
                                     ("HIGH CONFIDENCE", "green"), "Town", "Thu Jul 3", "2p")
         assert img.size == (800, 480)
+
+
+def test_stamp_stale_marks_top_right_corner():
+    img = Image.new("RGB", (render.WIDTH, render.HEIGHT), render.PAPER)
+    out = render.stamp_stale(img)
+    assert out.size == (render.WIDTH, render.HEIGHT)
+    # The pill sits in the top-right corner and is solid RED (no anti-aliasing).
+    assert any(out.getpixel((x, y)) == render.RED
+               for x in range(render.WIDTH - 60, render.WIDTH)
+               for y in range(0, 30))
+
+
+def test_stamp_stale_leaves_center_untouched():
+    img = Image.new("RGB", (render.WIDTH, render.HEIGHT), render.PAPER)
+    render.stamp_stale(img)
+    assert img.getpixel((render.WIDTH // 2, render.HEIGHT // 2)) == render.PAPER

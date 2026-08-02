@@ -219,3 +219,23 @@ def render_error(message):
     _ctext(draw, message, WIDTH / 2, HEIGHT / 2, display_font(18, 600), INK)
     _ctext(draw, "Will retry next hour", WIDTH / 2, HEIGHT / 2 + 34, display_font(14, 600), INK)
     return img
+
+
+def stamp_stale(img):
+    """Draw a small 'STALE' pill in the top-right corner; return the image.
+
+    The cached render already shows its original update time in the header, so
+    the pill only has to flag that the data is old, not when it was fetched.
+    """
+    draw = ImageDraw.Draw(img)
+    font = display_font(14, 600)
+    label = "STALE"
+    pad_x, pad_y, margin = 8, 4, 6
+    left, top, right, bottom = draw.textbbox((0, 0), label, font=font)
+    pw = (right - left) + 2 * pad_x
+    ph = (bottom - top) + 2 * pad_y
+    x0 = WIDTH - margin - pw
+    y0 = margin
+    draw.rounded_rectangle([x0, y0, x0 + pw, y0 + ph], radius=ph // 2, fill=RED)
+    _ctext(draw, label, x0 + pw / 2, y0 + ph / 2, font, WHITE)
+    return img
