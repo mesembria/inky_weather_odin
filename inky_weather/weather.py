@@ -11,6 +11,7 @@ parse_daily() returns a list of dicts, each with keys:
 import datetime
 import json
 import os
+import time
 from urllib.parse import urlencode
 
 import requests
@@ -102,11 +103,31 @@ def _raise_for_api_error(resp):
     raise WeatherAPIError("Weather API {} error: {}".format(resp.status_code, detail))
 
 
+def _get_with_retries(url, timeout, attempts=5, backoff=2.0, sleep=None):
+    """GET `url`, retrying only on connection-level failures.
+
+    Retries on requests' ConnectionError/Timeout (the "Max retries exceeded"
+    case) with exponential backoff (2, 4, 8, 16s across 5 attempts). Any other
+    exception propagates immediately, and the last connection error is re-raised
+    once attempts are exhausted. `sleep` is injectable so tests don't wait; when
+    None it resolves time.sleep at call time (so tests can patch weather.time.sleep).
+    """
+    sleeper = sleep or time.sleep
+    for attempt in range(attempts):
+        try:
+            return requests.get(url, timeout=timeout)
+        except (requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout):
+            if attempt == attempts - 1:
+                raise
+            sleeper(backoff * (2 ** attempt))
+
+
 def fetch_live(lat, long, key, hours=12, days=10, timeout=20):
     """Fetch and parse both forecasts from the live API. Returns (hours, days)."""
-    hourly_resp = requests.get(hourly_url(lat, long, key, hours), timeout=timeout)
+    hourly_resp = _get_with_retries(hourly_url(lat, long, key, hours), timeout)
     _raise_for_api_error(hourly_resp)
-    daily_resp = requests.get(daily_url(lat, long, key, days), timeout=timeout)
+    daily_resp = _get_with_retries(daily_url(lat, long, key, days), timeout)
     _raise_for_api_error(daily_resp)
     return (
         parse_hourly(hourly_resp.json(), count=hours),

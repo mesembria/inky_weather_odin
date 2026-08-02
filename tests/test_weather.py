@@ -3,6 +3,7 @@ import os
 from unittest import mock
 
 import pytest
+import requests
 
 from inky_weather import weather
 
@@ -282,5 +283,59 @@ def test_parse_sun_labels():
     data = {"daily": {"sunrise": ["2026-07-03T06:12"], "sunset": ["2026-07-03T20:31"]}}
     s = weather.parse_sun(data)
     assert s["sunrise"] == "6a" and s["sunset"] == "8p"
+
+
+def test_get_with_retries_returns_after_transient_failures():
+    resp = mock.Mock(ok=True)
+    slept = []
+    get = mock.Mock(side_effect=[
+        requests.exceptions.ConnectionError("boom"),
+        requests.exceptions.ConnectionError("boom"),
+        resp,
+    ])
+    with mock.patch("inky_weather.weather.requests.get", get):
+        out = weather._get_with_retries("http://x", timeout=1,
+                                        sleep=lambda s: slept.append(s))
+    assert out is resp
+    assert slept == [2, 4]
+
+
+def test_get_with_retries_exhausts_and_reraises():
+    slept = []
+    get = mock.Mock(side_effect=requests.exceptions.ConnectionError("down"))
+    with mock.patch("inky_weather.weather.requests.get", get):
+        with pytest.raises(requests.exceptions.ConnectionError):
+            weather._get_with_retries("http://x", timeout=1,
+                                      sleep=lambda s: slept.append(s))
+    assert get.call_count == 5
+    assert slept == [2, 4, 8, 16]
+
+
+def test_get_with_retries_does_not_retry_other_errors():
+    slept = []
+    get = mock.Mock(side_effect=ValueError("nope"))
+    with mock.patch("inky_weather.weather.requests.get", get):
+        with pytest.raises(ValueError):
+            weather._get_with_retries("http://x", timeout=1,
+                                      sleep=lambda s: slept.append(s))
+    assert get.call_count == 1
+    assert slept == []
+
+
+def test_fetch_live_retries_transient_then_succeeds():
+    hourly = mock.Mock(ok=True)
+    hourly.json.return_value = {"forecastHours": []}
+    daily = mock.Mock(ok=True)
+    daily.json.return_value = {"forecastDays": []}
+    get = mock.Mock(side_effect=[
+        requests.exceptions.ConnectionError("blip"),
+        hourly,
+        daily,
+    ])
+    with mock.patch("inky_weather.weather.requests.get", get):
+        with mock.patch("inky_weather.weather.time.sleep", lambda s: None):
+            hours, days = weather.fetch_live("40.0", "-105.1", "KEY")
+    assert hours == [] and days == []
+    assert get.call_count == 3
 
 
