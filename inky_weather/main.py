@@ -4,7 +4,7 @@ import datetime
 import os
 import sys
 
-from . import weather, icons, render, advice, history
+from . import weather, icons, render, advice, history, cache
 
 FIXTURE_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 ICON_CACHE = os.path.join(os.path.dirname(__file__), "assets", "icons")
@@ -100,14 +100,21 @@ def main(argv=None):
                         help="Write PNG to PATH instead of the display")
     args = parser.parse_args(argv)
 
+    use_fixture = args.fixture
     try:
-        if args.fixture:
+        if use_fixture:
             cfg = {"location_name": "Blacksburg, VA"}
         else:
             cfg = _load_config()
-        img = build_image(args.fixture, cfg)
-    except Exception as exc:  # render an error card rather than crash silently
-        img = render.render_error(str(exc)[:80])
+        img = build_image(use_fixture, cfg)
+        if not use_fixture:
+            cache.save_display(img)          # best-effort; keep last-good on disk
+    except Exception as exc:  # keep last-good forecast up rather than a blank error
+        cached = None if use_fixture else cache.load_display()
+        if cached is not None:
+            img = render.stamp_stale(cached)
+        else:
+            img = render.render_error(str(exc)[:80])
 
     if args.out:
         img.save(args.out)

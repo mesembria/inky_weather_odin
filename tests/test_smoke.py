@@ -120,6 +120,65 @@ def test_precip_gridlines_and_caption_only_when_wet():
             assert dry.getpixel((x, y)) == render.PAPER
 
 
+def test_main_saves_cache_on_live_success(tmp_path, monkeypatch):
+    from PIL import Image
+    from inky_weather import main, render
+    saved = []
+    monkeypatch.setattr(main, "_load_config", lambda: {"location_name": "T"})
+    monkeypatch.setattr(main, "build_image",
+                        lambda use_fixture, cfg: Image.new("RGB", (800, 480), render.PAPER))
+    monkeypatch.setattr(main.cache, "save_display",
+                        lambda img, *a, **k: saved.append(img))
+    out = tmp_path / "o.png"
+    main.main(["--out", str(out)])
+    assert len(saved) == 1
+
+
+def test_main_skips_cache_on_fixture(tmp_path, monkeypatch):
+    from inky_weather import main
+    saved = []
+    monkeypatch.setattr(main.cache, "save_display",
+                        lambda img, *a, **k: saved.append(img))
+    out = tmp_path / "o.png"
+    main.main(["--fixture", "--out", str(out)])
+    assert saved == []
+
+
+def test_main_stale_fallback_when_cache_present(tmp_path, monkeypatch):
+    from PIL import Image
+    from inky_weather import main, render
+    monkeypatch.setattr(main, "_load_config", lambda: {"location_name": "T"})
+    def boom(use_fixture, cfg):
+        raise RuntimeError("network down")
+    monkeypatch.setattr(main, "build_image", boom)
+    monkeypatch.setattr(main.cache, "load_display",
+                        lambda *a, **k: Image.new("RGB", (800, 480), render.PAPER))
+    out = tmp_path / "o.png"
+    main.main(["--out", str(out)])
+    img = Image.open(out).convert("RGB")
+    # Stale pill present in the top-right...
+    assert any(img.getpixel((x, y)) == render.RED
+               for x in range(render.WIDTH - 60, render.WIDTH) for y in range(0, 30))
+    # ...and it's NOT the error card (center stays PAPER).
+    assert img.getpixel((render.WIDTH // 2, render.HEIGHT // 2)) == render.PAPER
+
+
+def test_main_error_card_when_no_cache(tmp_path, monkeypatch):
+    from PIL import Image
+    from inky_weather import main, render
+    monkeypatch.setattr(main, "_load_config", lambda: {"location_name": "T"})
+    def boom(use_fixture, cfg):
+        raise RuntimeError("network down")
+    monkeypatch.setattr(main, "build_image", boom)
+    monkeypatch.setattr(main.cache, "load_display", lambda *a, **k: None)
+    out = tmp_path / "o.png"
+    main.main(["--out", str(out)])
+    img = Image.open(out).convert("RGB")
+    # Error card draws content across the center row.
+    assert any(img.getpixel((x, render.HEIGHT // 2)) != render.PAPER
+               for x in range(0, render.WIDTH, 10))
+
+
 def test_precip_gridlines_gate_at_pop_boundary():
     from PIL import Image, ImageDraw
     from inky_weather import render
