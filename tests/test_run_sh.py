@@ -69,6 +69,8 @@ def test_offline_still_runs(tmp_path):
              INKY_RUN_CMD="touch {}".format(ran))
     assert ran.exists()                     # ran despite fetch failure
     assert "fetch failed" in r.stdout
+    assert "up to date" not in r.stdout   # offline must not claim up-to-date
+    assert "updated" not in r.stdout
 
 
 def test_requirements_change_triggers_reinstall(tmp_path):
