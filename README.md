@@ -45,10 +45,43 @@ and US Air Quality Index from Open-Meteo (no API key required). Refreshes hourly
   ```
 
 ## Schedule (hourly refresh)
-Add to crontab (`crontab -e`), using the venv's Python:
+
+The Pi runs via `run.sh`, a wrapper that self-updates the checkout from
+`origin/main` before each run, then renders. Make it executable once:
+```bash
+chmod +x run.sh
 ```
-0 * * * * cd /home/pi/inky_weather_odin && /home/pi/inky_weather_odin/.venv/bin/python -m inky_weather.main >> /home/pi/weather.log 2>&1
+Add to crontab (`crontab -e`):
 ```
+0 * * * * /home/pi/inky_weather_odin/run.sh >> /home/pi/weather.log 2>&1
+```
+
+### Auto-update
+
+Each run, `run.sh`:
+1. `git fetch` + `git reset --hard origin/main` — the Pi always matches the latest
+   `main`. Your `config.py`, history, and cached image are gitignored, so the reset
+   never touches them.
+2. Reinstalls dependencies only if `requirements.txt` changed in that update.
+3. If the network is down (fetch fails), it skips the update and runs the code
+   already on disk — the display never goes dark over a failed pull.
+
+It logs one line per run to `weather.log`, e.g
+`… update: weather abc1234 -> def5678 (updated)` or `… (up to date)`.
+
+Caveat: if a push changes `run.sh` itself, the new wrapper takes effect on the
+*next* run (bash has already read the running copy).
+
+### Versioning
+
+The running version is `git describe --tags --always --dirty` — the short commit
+SHA until you tag, then the tag name. It appears in the log line above and in the
+top-right of the panel header (after the "updated" time). To cut a named release:
+```bash
+git tag v1.0.0 && git push --tags
+```
+After that the panel and log show `v1.0.0` (or e.g. `v1.0.0-3-gabc1234` three
+commits later).
 
 ## Development (on a Mac)
 Use a virtualenv (Homebrew/system Python blocks global `pip install` under
