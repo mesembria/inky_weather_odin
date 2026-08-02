@@ -73,6 +73,20 @@ def test_offline_still_runs(tmp_path):
     assert "updated" not in r.stdout
 
 
+def test_pushed_tag_is_picked_up_in_version(tmp_path):
+    origin, clone = _make_origin_and_clone(tmp_path)
+    # tag a new origin commit, as if `git push --tags`
+    _git(origin, "commit", "-q", "--allow-empty", "-m", "release")
+    _git(origin, "tag", "v1.0.0")
+    ran = clone / "ran.marker"
+    r = _run(clone, INKY_RUN_CMD="touch {}".format(ran))
+    # the clone must fetch the tag so `git describe --tags` resolves it, not a SHA
+    desc = subprocess.run(["git", "describe", "--tags", "--always"],
+                          cwd=str(clone), capture_output=True, text=True)
+    assert desc.stdout.strip() == "v1.0.0"   # tag was fetched to the clone
+    assert "v1.0.0" in r.stdout              # version shows in the run.sh log line
+
+
 def test_requirements_change_triggers_reinstall(tmp_path):
     origin, clone = _make_origin_and_clone(tmp_path)
     (origin / "requirements.txt").write_text("requests\nPillow\n")

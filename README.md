@@ -51,10 +51,16 @@ The Pi runs via `run.sh`, a wrapper that self-updates the checkout from
 ```bash
 chmod +x run.sh
 ```
-Add to crontab (`crontab -e`):
+Add to crontab (`crontab -e`). `cron` sets `$HOME` to the crontab owner's home,
+so `$HOME` keeps this correct whatever your username is — substitute a literal
+absolute path only if you keep the repo elsewhere:
 ```
-0 * * * * /home/pi/inky_weather_odin/run.sh >> /home/pi/weather.log 2>&1
+0 * * * * $HOME/inky_weather_odin/run.sh >> $HOME/weather.log 2>&1
 ```
+The log path must be one the cron user can write. Pointing it at another user's
+home (e.g. a hard-coded `/home/pi/...` when you run as a different user) makes the
+shell fail to open the redirect, and the job never runs — the panel just goes
+stale with nothing in the log.
 
 ### Auto-update
 

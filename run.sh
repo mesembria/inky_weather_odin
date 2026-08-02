@@ -12,7 +12,7 @@ log(){ echo "$(date '+%F %T') update: $*"; }
 before=$(git rev-parse HEAD 2>/dev/null || echo none); before_ver=$(ver)
 req_before=$(git hash-object requirements.txt 2>/dev/null || echo none)
 fetched=0
-if git fetch --quiet "$REMOTE" "$BRANCH" 2>/dev/null; then
+if git fetch --quiet --tags "$REMOTE" "$BRANCH" 2>/dev/null; then
   fetched=1
   git reset --hard --quiet FETCH_HEAD
 else
