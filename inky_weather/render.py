@@ -235,7 +235,7 @@ def stamp_stale(img):
     pw = (right - left) + 2 * pad_x
     ph = (bottom - top) + 2 * pad_y
     x0 = WIDTH - margin - pw
-    y0 = margin
+    y0 = HEADER_RULE_Y + 4
     draw.rounded_rectangle([x0, y0, x0 + pw, y0 + ph], radius=ph // 2, fill=RED)
     _ctext(draw, label, x0 + pw / 2, y0 + ph / 2, font, WHITE)
     return img

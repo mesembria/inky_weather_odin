@@ -74,13 +74,33 @@ def test_stamp_stale_marks_top_right_corner():
     img = Image.new("RGB", (render.WIDTH, render.HEIGHT), render.PAPER)
     out = render.stamp_stale(img)
     assert out.size == (render.WIDTH, render.HEIGHT)
-    # The pill sits in the top-right corner and is solid RED (no anti-aliasing).
+    # The pill sits below the header rule in the top-right corner and is solid
+    # RED (no anti-aliasing).
     assert any(out.getpixel((x, y)) == render.RED
                for x in range(render.WIDTH - 60, render.WIDTH)
-               for y in range(0, 30))
+               for y in range(render.HEADER_RULE_Y, render.HEADER_RULE_Y + 30))
 
 
 def test_stamp_stale_leaves_center_untouched():
     img = Image.new("RGB", (render.WIDTH, render.HEIGHT), render.PAPER)
     render.stamp_stale(img)
     assert img.getpixel((render.WIDTH // 2, render.HEIGHT // 2)) == render.PAPER
+
+
+def test_stamp_stale_does_not_cover_confidence_badge():
+    # A real render carries a confidence badge in the header top-right (y~15).
+    # Use a non-red accent so any exact-RED pixel in that band can only be the pill.
+    hours = [{"hour": (10 + i), "ampm_label": "{}p".format(i or 12), "is_daytime": True,
+              "condition": "CLEAR", "icon_uri": "", "temp_f": 70 + i, "feels_f": 70 + i,
+              "pop": 10, "precip_type": "RAIN", "thunder": 0, "uv": 3} for i in range(12)]
+    cards = [{"cat": "DRESS", "verdict": "Warm", "detail": "70-81°", "accent": "orange"}]
+    img = render.render_display(hours, [], [None] * 12, cards,
+                               ("HIGH CONFIDENCE", "green"), "Town", "Thu Jul 3", "2p")
+    render.stamp_stale(img)
+    badge_band = [img.getpixel((x, y))
+                  for x in range(render.WIDTH - 60, render.WIDTH) for y in range(8, 22)]
+    assert render.RED not in badge_band            # pill no longer overprints the badge row
+    below_rule = [img.getpixel((x, y))
+                  for x in range(render.WIDTH - 60, render.WIDTH)
+                  for y in range(render.HEADER_RULE_Y, render.HEADER_RULE_Y + 30)]
+    assert render.RED in below_rule                # pill is present just below the header rule

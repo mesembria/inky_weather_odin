@@ -156,9 +156,10 @@ def test_main_stale_fallback_when_cache_present(tmp_path, monkeypatch):
     out = tmp_path / "o.png"
     main.main(["--out", str(out)])
     img = Image.open(out).convert("RGB")
-    # Stale pill present in the top-right...
+    # Stale pill present in the top-right, below the header rule...
     assert any(img.getpixel((x, y)) == render.RED
-               for x in range(render.WIDTH - 60, render.WIDTH) for y in range(0, 30))
+               for x in range(render.WIDTH - 60, render.WIDTH)
+               for y in range(render.HEADER_RULE_Y, render.HEADER_RULE_Y + 30))
     # ...and it's NOT the error card (center stays PAPER).
     assert img.getpixel((render.WIDTH // 2, render.HEIGHT // 2)) == render.PAPER
 

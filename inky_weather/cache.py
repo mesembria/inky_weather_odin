@@ -18,7 +18,7 @@ def save_display(img, path=DEFAULT_PATH):
         tmp = path + ".tmp"
         img.save(tmp, "PNG")
         os.replace(tmp, path)
-    except OSError:
+    except Exception:
         pass
 
 

@@ -68,7 +68,11 @@ def _get_with_retries(url, timeout, attempts=5, backoff=2.0, sleep=time.sleep):
   `WeatherAPIError` raised by `_raise_for_api_error` after a successful GET)
   propagates immediately — no retry.
 - Defaults: `attempts=5`, `backoff=2.0` → sleeps of 2, 4, 8, 16s (worst case
-  ~30s of waiting before falling back).
+  ~30s of waiting before falling back). Note this 30s figure is only the sleep
+  budget between attempts; it excludes per-request connection timeouts. With
+  `timeout=20` and two URLs (hourly + daily) each retried up to 5 times, a
+  fully hung network can take up to ~4 minutes before the stale fallback
+  kicks in. That's acceptable on an hourly cron, since runs never overlap.
 
 ### 2. Cache the last-good render (`cache.py`, new module)
 

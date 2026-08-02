@@ -5,6 +5,7 @@ __pycache__/
 inky_weather/config.py
 inky_weather/daily_history.json
 inky_weather/last_display.png
+inky_weather/*.tmp
 inky_weather/assets/icons/
 *.out.png
 # generated preview/screenshot artifacts at repo root
