@@ -207,6 +207,16 @@ def test_precip_meter_uses_storm_color():
     assert _band_color_count(hours, (render.BLUE,)) == 0
 
 
+def test_precip_meter_draws_faint_headroom():
+    # tier 1 fills 1 segment; the 3 empty segments above are faint INK-dot outlines
+    img = Image.new("RGB", (100, 120), render.WHITE)
+    d = ImageDraw.Draw(img)
+    render._draw_precip_meter(d, 50, 110, 80, 12, 1, render.BLUE)
+    # INK pixels exist above the single filled bottom segment (the headroom outlines)
+    assert any(img.getpixel((x, y)) == render.INK
+               for x in range(100) for y in range(30, 80))
+
+
 def test_precip_buckets_are_quantized():
     # 30% and 50% are both 'chance' -> identical meter; 90% ('definite') differs.
     blue = (render.BLUE,)
