@@ -210,28 +210,21 @@ def draw_graph(img, draw, hours, bands, icons, gx, gy, gw, gh):
         draw.polygon(poly([b[0] for b in bands], [b[3] for b in bands]), fill=BAND_OUT)
         draw.polygon(poly([b[1] for b in bands], [b[2] for b in bands]), fill=BAND_IN)
 
-    # precip strip (grounded pop% bars, colored by kind)
+    # precip strip (grounded 4-bucket meter, colored by kind)
     pbase = axis_y
     sc = bandh - 14
     wet = any(h["pop"] >= 5 for h in hours)
     if wet:
-        # faint 50% + 100% reference lines so each bar reads against its ceiling
-        for frac in (0.5, 1.0):
-            gyv = pbase - sc * frac
-            _dotted_line(draw, lx, gx + gw, gyv, GRIDLINE)
-    for i, h in enumerate(hours):
-        pop = h["pop"]
-        if pop < 5:
-            continue
-        bx = xs[i]
-        bw = (gw - 32) / n * 0.30
-        bh = (pop / 100.0) * sc
-        kind = weather.precip_kind(pop, h["precip_type"], h["thunder"])
-        col = _KIND_BAR.get(kind, BLUE)
-        draw.rectangle([bx - bw, pbase - bh, bx + bw, pbase], fill=col)
-        _ctext(draw, "{}%".format(pop), bx, pbase - bh - 8, display_font(12, 600), col)
-    if wet:
-        _ctext(draw, "RAIN %", gx + 2, pbase - bandh + 2, display_font(10, 600), INK, anchor="lm")
+        half = min((gw - 32) / n * 0.32, 16)
+        for i, h in enumerate(hours):
+            t = _precip_tier(h["pop"])
+            if t == 0:
+                continue
+            kind = weather.precip_kind(h["pop"], h["precip_type"], h["thunder"])
+            col = _KIND_BAR.get(kind, BLUE)
+            _draw_precip_meter(draw, xs[i], pbase, sc, half, t, col)
+        _ctext(draw, "RAIN", gx + 2, pbase - bandh + 2, display_font(10, 600),
+               INK, anchor="lm")
 
     # temp line + points + labels + icons
     ys = [Y(t) for t in temps]

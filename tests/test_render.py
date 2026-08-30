@@ -166,3 +166,51 @@ def test_precip_meter_is_grounded_at_baseline():
     render._draw_precip_meter(d, 50, 110, 80, 12, 4, render.BLUE)
     assert all(img.getpixel((x, y)) == render.WHITE
                for x in range(100) for y in range(112, 120))
+
+
+def _graph_hours(pop, thunder=0, ptype="RAIN"):
+    return [{"hour": (10 + i), "ampm_label": "{}p".format(i or 12),
+             "is_daytime": True, "condition": "CLEAR", "icon_uri": "",
+             "temp_f": 70 + i, "feels_f": 70 + i, "pop": pop,
+             "precip_type": ptype, "thunder": thunder, "uv": 3}
+            for i in range(12)]
+
+
+def _band_color_count(hours, colors):
+    """Count precip-colored pixels in the grounded meter band of a full graph."""
+    img = Image.new("RGB", (render.WIDTH, render.HEIGHT), render.WHITE)
+    d = ImageDraw.Draw(img)
+    render.draw_graph(img, d, hours, [], [None] * 12, 14, 160,
+                      render.WIDTH - 28, 300)
+    axis_y = 160 + 300 - 16          # matches draw_graph's axis_y for these args
+    return sum(1 for x in range(14, render.WIDTH - 14)
+               for y in range(axis_y - 70, axis_y - 2)
+               if img.getpixel((x, y)) in colors)
+
+
+def test_precip_meter_absent_when_dry():
+    # All hours below the dry threshold -> no meter pixels, whatever the color.
+    count = _band_color_count(_graph_hours(0),
+                              (render.BLUE, render.RED, render.PURPLE))
+    assert count == 0
+
+
+def test_precip_meter_present_when_wet():
+    count = _band_color_count(_graph_hours(90), (render.BLUE,))
+    assert count > 0
+
+
+def test_precip_meter_uses_storm_color():
+    # thunder >= 30 classifies as storm -> RED fill.
+    hours = _graph_hours(90, thunder=50)
+    assert _band_color_count(hours, (render.RED,)) > 0
+    assert _band_color_count(hours, (render.BLUE,)) == 0
+
+
+def test_precip_buckets_are_quantized():
+    # 30% and 50% are both 'chance' -> identical meter; 90% ('definite') differs.
+    blue = (render.BLUE,)
+    assert _band_color_count(_graph_hours(30), blue) == \
+           _band_color_count(_graph_hours(50), blue)
+    assert _band_color_count(_graph_hours(30), blue) != \
+           _band_color_count(_graph_hours(90), blue)
