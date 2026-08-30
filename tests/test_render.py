@@ -132,3 +132,37 @@ def test_draw_header_renders_version_when_given():
 ])
 def test_precip_tier_boundaries(pop, tier):
     assert render._precip_tier(pop) == tier
+
+
+def _meter_img():
+    img = Image.new("RGB", (100, 120), render.WHITE)
+    return img, ImageDraw.Draw(img)
+
+
+def _count(img, color):
+    return sum(1 for x in range(100) for y in range(120)
+               if img.getpixel((x, y)) == color)
+
+
+def test_precip_meter_fill_increases_with_tier():
+    counts = []
+    for t in (1, 2, 3, 4):
+        img, d = _meter_img()
+        render._draw_precip_meter(d, 50, 110, 80, 12, t, render.BLUE)
+        counts.append(_count(img, render.BLUE))
+    assert counts[0] < counts[1] < counts[2] < counts[3]
+
+
+def test_precip_meter_uses_kind_color():
+    img, d = _meter_img()
+    render._draw_precip_meter(d, 50, 110, 80, 12, 1, render.RED)
+    assert _count(img, render.RED) > 0
+    assert _count(img, render.BLUE) == 0
+
+
+def test_precip_meter_is_grounded_at_baseline():
+    # Baseline is pbase=110; nothing should be filled below it.
+    img, d = _meter_img()
+    render._draw_precip_meter(d, 50, 110, 80, 12, 4, render.BLUE)
+    assert all(img.getpixel((x, y)) == render.WHITE
+               for x in range(100) for y in range(112, 120))

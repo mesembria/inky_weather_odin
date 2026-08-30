@@ -99,6 +99,40 @@ def _precip_tier(pop):
     return sum(pop >= t for t in _PRECIP_TIERS)
 
 
+def _faint_rect(d, x0, y0, x1, y1, step=GRIDLINE_STEP):
+    """Panel-safe faint rectangle outline: stipple the perimeter with INK dots.
+
+    A near-white gray would snap to white and vanish on the 6-color panel, so
+    'faint' comes from dot coverage instead — the same trick the gridlines use.
+    """
+    x0, y0, x1, y1 = (int(round(v)) for v in (x0, y0, x1, y1))
+    for x in range(x0, x1 + 1, step):
+        d.point((x, y0), fill=INK)
+        d.point((x, y1), fill=INK)
+    for y in range(y0, y1 + 1, step):
+        d.point((x0, y), fill=INK)
+        d.point((x1, y), fill=INK)
+
+
+def _draw_precip_meter(d, cx, pbase, sc, half, tier, color):
+    """Grounded 4-segment precip meter centered at cx.
+
+    The bottom `tier` segments (0-4) are filled solid in `color`; the remaining
+    segments are drawn as faint outlines so the meter reads as "N out of 4".
+    """
+    seg_n = 4
+    gap = 3
+    seg_h = (sc - gap * (seg_n - 1)) / seg_n
+    for s in range(seg_n):
+        sb = pbase - s * (seg_h + gap)
+        st = sb - seg_h
+        box = [cx - half, st, cx + half, sb]
+        if s < tier:
+            d.rounded_rectangle(box, radius=2, fill=color)
+        else:
+            _faint_rect(d, cx - half, st, cx + half, sb)
+
+
 def _updated_label(updated_str, version=None):
     """The header's updated-time line, optionally suffixed with the running version."""
     base = updated_str + " · NEXT 12H"
