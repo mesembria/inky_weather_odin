@@ -89,6 +89,15 @@ BAND_IN = (178, 190, 224)
 
 _KIND_BAR = {"storm": RED, "snow": PURPLE, "mix": PURPLE, "rain": BLUE, "dry": BLUE}
 
+# Precip probability buckets (lower bound of each non-dry tier), NWS-style:
+# dry <5, slight 5-24, chance 25-54, likely 55-79, definite 80+.
+_PRECIP_TIERS = (5, 25, 55, 80)
+
+
+def _precip_tier(pop):
+    """Map pop% to a bucket: 0=dry, 1=slight, 2=chance, 3=likely, 4=definite."""
+    return sum(pop >= t for t in _PRECIP_TIERS)
+
 
 def _updated_label(updated_str, version=None):
     """The header's updated-time line, optionally suffixed with the running version."""

@@ -1,5 +1,6 @@
 from PIL import Image, ImageDraw
 from inky_weather import render
+import pytest
 
 
 def test_dimensions():
@@ -120,3 +121,14 @@ def test_draw_header_renders_version_when_given():
     img2, d2 = _blank()
     render.draw_header(d2, "Town", "Tue Jun 30", "10:02 AM", None, "v9.9.9")
     assert img1.tobytes() != img2.tobytes()   # version text is actually drawn
+
+
+@pytest.mark.parametrize("pop,tier", [
+    (0, 0), (4, 0),        # dry
+    (5, 1), (24, 1),       # slight
+    (25, 2), (54, 2),      # chance
+    (55, 3), (79, 3),      # likely
+    (80, 4), (100, 4),     # definite
+])
+def test_precip_tier_boundaries(pop, tier):
+    assert render._precip_tier(pop) == tier
