@@ -81,20 +81,13 @@ def test_gridlines_are_dotted_not_solid():
     assert on < len(row) * 0.5          # but it is not a solid rule
 
 
-def test_precip_gridlines_and_caption_only_when_wet():
+def test_precip_meter_only_when_wet():
     from PIL import Image, ImageDraw
     from inky_weather import render
 
     W, H = render.WIDTH, render.HEIGHT
     axis_y = render.GRAPH_Y + render.GRAPH_H - 16   # matches draw_graph's axis_y
     sc = 82 - 14                                    # bandh - 14 (bar-band scale)
-    y100, y50 = axis_y - sc, axis_y - int(sc * 0.5)  # 100% and 50% gridline rows
-    # gridlines are dotted, so scan a span rather than probing a single pixel
-    span = range(80, 130)   # on the full-width gridlines, clear of every bar column
-    GRID = render.GRIDLINE
-
-    def dots(img, y):
-        return sum(1 for x in span if img.getpixel((x, y)) == GRID)
 
     def render_hours(pops):
         img = Image.new("RGB", (W, H), render.PAPER)
@@ -107,14 +100,13 @@ def test_precip_gridlines_and_caption_only_when_wet():
                           14, render.GRAPH_Y, W - 28, render.GRAPH_H)
         return img
 
-    # wet: both reference lines are drawn, checked at a column clear of any bar
+    # wet: the meter band contains filled (blue) meter pixels
     wet = render_hours([0, 0, 0, 0, 0, 60, 0, 0, 0, 0, 0, 0])
-    assert dots(wet, y100) > 0     # 100% line present
-    assert dots(wet, y50) > 0      # 50% line present
-    # dry: strip is completely clean — no lines, no caption, no bars
+    assert any(wet.getpixel((x, y)) == render.BLUE
+               for x in range(45, W - 20)
+               for y in range(axis_y - sc, axis_y))
+    # dry: strip is completely clean — no meter pixels, no caption, no bars
     dry = render_hours([0] * 12)
-    assert dots(dry, y100) == 0
-    assert dots(dry, y50) == 0
     for y in range(axis_y - sc - 2, axis_y - 1):
         for x in range(45, W - 20):
             assert dry.getpixel((x, y)) == render.PAPER
