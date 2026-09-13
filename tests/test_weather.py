@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 from unittest import mock
@@ -339,3 +340,42 @@ def test_fetch_live_retries_transient_then_succeeds():
     assert get.call_count == 3
 
 
+
+
+def test_parse_daily_exposes_display_date():
+    data = _load_fixture("daily_response.json")
+    first = weather.parse_daily(data, count=10)[0]
+    assert first["date"] == datetime.date(2026, 6, 30)
+
+
+def test_parse_daily_date_is_none_without_display_date():
+    days = weather.parse_daily({"forecastDays": [{}]}, count=10)
+    assert days[0]["date"] is None
+
+
+def test_days_from_drops_yesterdays_leading_day():
+    # Google's forecast day runs 07:00->07:00 local, so a run before 07:00 gets
+    # yesterday's day at index 0. Align so index 0 is really today.
+    days = [{"date": datetime.date(2026, 9, 12), "hi_f": 75},
+            {"date": datetime.date(2026, 9, 13), "hi_f": 92},
+            {"date": datetime.date(2026, 9, 14), "hi_f": 83}]
+    out = weather.days_from(days, datetime.date(2026, 9, 13))
+    assert [d["hi_f"] for d in out] == [92, 83]
+
+
+def test_days_from_keeps_list_when_already_today():
+    days = [{"date": datetime.date(2026, 9, 13), "hi_f": 92},
+            {"date": datetime.date(2026, 9, 14), "hi_f": 83}]
+    out = weather.days_from(days, datetime.date(2026, 9, 13))
+    assert [d["hi_f"] for d in out] == [92, 83]
+
+
+def test_days_from_tolerates_missing_dates():
+    days = [{"hi_f": 92}, {"hi_f": 83}]
+    assert weather.days_from(days, datetime.date(2026, 9, 13)) == days
+
+
+def test_days_from_keeps_last_day_rather_than_emptying():
+    # never strand the caller with nothing to show
+    days = [{"date": datetime.date(2026, 9, 11), "hi_f": 70}]
+    assert weather.days_from(days, datetime.date(2026, 9, 13)) == days

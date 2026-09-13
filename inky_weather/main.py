@@ -51,6 +51,10 @@ def build_image(use_fixture, cfg):
                  "stretch_his": [d["hi_f"] for d in days[1:4]]}
     else:
         hours, days = weather.fetch_live(cfg["lat"], cfg["long"], cfg["google_weather_key"])
+        # Google's forecast day runs 07:00->07:00 local, so before 07:00 index 0 is
+        # still yesterday. Realign once, here, so every day-scale consumer below
+        # (trend, outlook, recorded high) agrees with the hourly feed on "today".
+        days = weather.days_from(days, now.date())
         fh = hours[0]["hour"]
         bands_gust = _safe(lambda: weather.fetch_ensemble(cfg["lat"], cfg["long"], fh),
                            default=([], []))

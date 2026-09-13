@@ -4,7 +4,7 @@ parse_hourly() returns a list of dicts, each with keys:
     hour, ampm_label, is_daytime, condition, icon_uri, temp_f, feels_f,
     pop, precip_type, thunder, uv
 parse_daily() returns a list of dicts, each with keys:
-    name, icon_uri, hi_f, lo_f, day, night
+    date, name, icon_uri, hi_f, lo_f, day, night
     where day/night are dicts with keys: pop, precip_type, qpf_mm, thunder
 """
 
@@ -147,12 +147,33 @@ def load_from_fixtures(fixture_dir, hours=12, days=10):
 _WEEKDAY = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
 
 
+def _display_date(display_date):
+    """Return a date from a Google displayDate dict, or None if missing."""
+    if not display_date:
+        return None
+    return datetime.date(display_date["year"], display_date["month"], display_date["day"])
+
+
 def _day_name(display_date):
     """Return a 3-letter weekday from a Google displayDate dict, or '' if missing."""
-    if not display_date:
-        return ""
-    d = datetime.date(display_date["year"], display_date["month"], display_date["day"])
-    return _WEEKDAY[d.weekday()]
+    d = _display_date(display_date)
+    return _WEEKDAY[d.weekday()] if d else ""
+
+
+def days_from(days, today):
+    """Drop leading forecast days that are already over, so days[0] is today.
+
+    Google's forecast day runs 07:00 -> 07:00 local, not midnight to midnight, so
+    a run between local midnight and 07:00 gets YESTERDAY's day at index 0 (its
+    displayDate proves it). Everything downstream — the trend card, the outlook
+    card, the persisted daily high — reads index 0 as "today", so realign here
+    rather than teaching each of them the 7am boundary. Entries without a date
+    (and a list that would otherwise empty out) are passed through unchanged.
+    """
+    for i, d in enumerate(days):
+        if d.get("date") is None or d["date"] >= today:
+            return days[i:]
+    return days
 
 
 def _parse_precip_block(block):
@@ -178,6 +199,7 @@ def parse_daily(data, count=10):
         night_block = obj.get("nighttimeForecast", {})
         cond = day_block.get("weatherCondition", {})
         days.append({
+            "date": _display_date(obj.get("displayDate", {})),
             "name": _day_name(obj.get("displayDate", {})),
             "icon_uri": cond.get("iconBaseUri", ""),
             "hi_f": c_to_f(obj.get("maxTemperature", {}).get("degrees", 0)),
